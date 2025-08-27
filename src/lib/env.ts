@@ -62,11 +62,17 @@ function validateEnv(): Env {
   }
 }
 
-// Skip validation during build process, only validate at actual runtime
-export const env = process.env.SKIP_ENV_VALIDATION === 'true'
-  ? envSchema.partial().parse(process.env) as Env
-  : (typeof window === 'undefined' && process.env.NODE_ENV === 'production' && process.argv?.[1]?.includes('next-server'))
-    ? validateEnv()
-    : envSchema.partial().parse(process.env) as Env;
+// Lazy-load environment validation to prevent build-time errors
+let _env: Env | null = null;
+
+export const env = new Proxy({} as Env, {
+  get(target, prop) {
+    if (!_env) {
+      // Only validate during actual runtime, never during build
+      _env = envSchema.partial().parse(process.env) as Env;
+    }
+    return _env[prop as keyof Env];
+  }
+});
 
 export default env;
