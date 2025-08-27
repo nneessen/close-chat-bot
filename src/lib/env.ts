@@ -62,17 +62,7 @@ function validateEnv(): Env {
   }
 }
 
-// Lazy-load environment validation to prevent build-time errors
-let _env: Env | null = null;
-
-export const env = new Proxy({} as Env, {
-  get(target, prop) {
-    if (!_env) {
-      // Only validate during actual runtime, never during build
-      _env = envSchema.partial().parse(process.env) as Env;
-    }
-    return _env[prop as keyof Env];
-  }
-});
+// Always use partial parsing to avoid build-time validation errors
+export const env = envSchema.partial().parse(process.env) as Env;
 
 export default env;
