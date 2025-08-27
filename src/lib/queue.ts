@@ -3,12 +3,35 @@ import Redis from 'ioredis';
 import { processSMSWebhook } from '@/services/sms-processor';
 import { processCalendlyWebhook } from '@/services/calendly-processor';
 
+// Parse Redis URL for authentication
+const parseRedisUrl = (url: string) => {
+  try {
+    const redisUrl = new URL(url);
+    return {
+      host: redisUrl.hostname,
+      port: parseInt(redisUrl.port || '6379'),
+      password: redisUrl.password || undefined,
+      username: redisUrl.username || 'default',
+    };
+  } catch {
+    // Fallback for local development
+    return {
+      host: 'localhost',
+      port: 6379,
+    };
+  }
+};
+
+const redisConfig = parseRedisUrl(process.env.REDIS_URL!);
+
 // Create separate connections for queue and worker (BullMQ requirement)
-const queueConnection = new Redis(process.env.REDIS_URL!, {
+const queueConnection = new Redis({
+  ...redisConfig,
   maxRetriesPerRequest: null,
 });
 
-const workerConnection = new Redis(process.env.REDIS_URL!, {
+const workerConnection = new Redis({
+  ...redisConfig,
   maxRetriesPerRequest: null,
 });
 
@@ -87,3 +110,4 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export { queueConnection as connection };
+export { queueConnection as redis };
