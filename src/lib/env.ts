@@ -62,7 +62,8 @@ function validateEnv(): Env {
   }
 }
 
-export const env = process.env.NODE_ENV === 'production' 
+// Only validate required env vars at runtime, not during build
+export const env = typeof window === 'undefined' && process.env.NODE_ENV === 'production' && process.env.RAILWAY_ENVIRONMENT_NAME
   ? validateEnv()
   : envSchema.partial().parse(process.env) as Env;
 
