@@ -274,7 +274,7 @@ async function generateBotResponse(
       email: lead.email || undefined,
       phone: lead.phone,
       leadId: lead.id,
-      state: extractStateFromMetadata(lead.metadata),
+      state: extractStateFromMetadata(lead.metadata as Record<string, unknown> | null),
     },
     userMessage,
     conversationId,
@@ -408,11 +408,13 @@ function determineConversationStageFromHistory(messages: Array<{ content: string
   return 'objection';
 }
 
-function extractStateFromMetadata(metadata: any): string | undefined {
+function extractStateFromMetadata(metadata: Record<string, unknown> | null): string | undefined {
   if (!metadata) return undefined;
   
   // Try to extract state from various possible fields in Close.io metadata
-  if (metadata.addresses && metadata.addresses[0]?.state) {
+  if (metadata.addresses && Array.isArray(metadata.addresses) && metadata.addresses[0] && 
+      typeof metadata.addresses[0] === 'object' && metadata.addresses[0] !== null &&
+      'state' in metadata.addresses[0] && typeof metadata.addresses[0].state === 'string') {
     return metadata.addresses[0].state;
   }
   

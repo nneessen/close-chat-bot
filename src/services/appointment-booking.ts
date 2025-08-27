@@ -24,6 +24,7 @@ interface AppointmentBookingResult {
     dateTime: string;
     duration: number;
     calendlyUri?: string;
+    appointmentId?: string;
   };
 }
 
@@ -215,7 +216,7 @@ export class AppointmentBookingService {
     dateTime: string, 
     eventTypeUri: string, 
     leadInfo: { name: string; email?: string; phone: string; leadId: string }
-  ): Promise<{ success: boolean; appointmentDetails?: any; error?: string }> {
+  ): Promise<{ success: boolean; appointmentDetails?: { id: string; scheduledAt: string; eventUri: string }; error?: string }> {
     try {
       console.log('📅 Booking appointment:', { dateTime, leadInfo: leadInfo.name });
 
