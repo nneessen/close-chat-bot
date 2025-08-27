@@ -4,6 +4,7 @@ import { llmService } from './llm';
 import { closeService } from './close';
 import { appointmentBookingService } from './appointment-booking';
 import { conversationLearningService } from './conversation-learning';
+import { leadNurturingService } from './lead-nurturing';
 import { BotType, MessageRole, ConversationStatus, Lead } from '@prisma/client';
 
 export async function processSMSWebhook(
@@ -224,15 +225,20 @@ async function determineBotType(messageContent: string): Promise<BotType> {
   
   // Keywords that indicate appointment scheduling
   const appointmentKeywords = [
-    'appointment', 'schedule', 'meeting', 'call', 'book', 'available',
-    'calendar', 'time', 'when', 'appointment', 'consultation'
+    'appointment', 'schedule', 'meeting', 'book', 'available',
+    'calendar', 'time slots', 'when can', 'what time', 'consultation'
   ];
   
   // Check if message is a number (1-9) for time slot selection
   const isNumberSelection = /^[1-9]$/.test(messageContent.trim());
   
-  // Check if message contains appointment-related keywords
-  const hasAppointmentKeywords = appointmentKeywords.some(keyword => 
+  // Don't trigger appointment mode for nurturing questions
+  const isNurturingQuestion = lowerContent.includes('couple questions') || 
+                              lowerContent.includes('ask you') ||
+                              lowerContent.includes('before we hop on');
+  
+  // Check if message contains appointment-related keywords (but not nurturing questions)
+  const hasAppointmentKeywords = !isNurturingQuestion && appointmentKeywords.some(keyword => 
     lowerContent.includes(keyword)
   );
   
@@ -250,51 +256,78 @@ async function generateBotResponse(
   botType: BotType,
   lead: Lead
 ) {
-  // If this is appointment bot, try to handle booking directly
-  if (botType === BotType.APPOINTMENT) {
-    console.log('🤖 Using appointment booking service');
+  // Get conversation history
+  const messages = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: 'asc' },
+    take: 10,
+  });
+
+  // First, try lead nurturing flow for all conversations
+  console.log('🎯 Using lead nurturing service');
+  
+  const nurturingContext = {
+    leadInfo: {
+      name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'there',
+      firstName: lead.firstName || '',
+      lastName: lead.lastName || '',
+      email: lead.email || undefined,
+      phone: lead.phone,
+      leadId: lead.id,
+      state: extractStateFromMetadata(lead.metadata),
+    },
+    userMessage,
+    conversationId,
+    previousMessages: messages.map(msg => ({
+      role: msg.role.toLowerCase() as 'user' | 'assistant',
+      content: msg.content,
+      timestamp: msg.createdAt.toISOString(),
+    })),
+  };
+
+  try {
+    const nurturingResult = await leadNurturingService.processNurturingFlow(nurturingContext);
     
-    // Get conversation history
-    const messages = await prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      take: 10,
-    });
-
-    const appointmentContext = {
-      leadInfo: {
-        name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'there',
-        email: lead.email || undefined,
-        phone: lead.phone,
-        leadId: lead.id,
-      },
-      userMessage,
-      conversationId,
-      previousMessages: messages.map(msg => ({
-        role: msg.role.toLowerCase() as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: msg.createdAt.toISOString(),
-      })),
-    };
-
-    try {
-      const bookingResult = await appointmentBookingService.handleAppointmentRequest(appointmentContext);
+    // If we're at appointment booking stage, use appointment service
+    if (nurturingResult.stage === 'appointment_booking' || botType === BotType.APPOINTMENT) {
+      console.log('🤖 Switching to appointment booking service');
       
-      // Return the booking service response
-      return {
-        content: bookingResult.response,
-        tokens: bookingResult.response.length / 4, // Rough estimate
-        finishReason: 'stop',
-        model: 'appointment-booking-system'
+      const appointmentContext = {
+        leadInfo: nurturingContext.leadInfo,
+        userMessage,
+        conversationId,
+        previousMessages: nurturingContext.previousMessages,
       };
-    } catch (error) {
-      console.error('❌ Appointment booking error:', error);
-      // Fall back to LLM if booking service fails
+
+      try {
+        const bookingResult = await appointmentBookingService.handleAppointmentRequest(appointmentContext);
+        
+        return {
+          content: bookingResult.response,
+          tokens: bookingResult.response.length / 4,
+          finishReason: 'stop',
+          model: 'appointment-booking-system'
+        };
+      } catch (error) {
+        console.error('❌ Appointment booking error:', error);
+        // Fall back to nurturing response
+      }
     }
+
+    // Return the nurturing service response
+    return {
+      content: nurturingResult.response,
+      tokens: nurturingResult.response.length / 4,
+      finishReason: 'stop',
+      model: 'lead-nurturing-system'
+    };
+  } catch (error) {
+    console.error('❌ Lead nurturing error:', error);
+    // Fall back to existing logic
   }
 
   // For non-appointment bot or if appointment booking fails, use AI with learned patterns
-  const messages = await prisma.message.findMany({
+  const conversationMessages = await prisma.message.findMany({
     where: { conversationId },
     orderBy: { createdAt: 'asc' },
     take: 10,
@@ -310,7 +343,7 @@ async function generateBotResponse(
   const learnedResponse = await conversationLearningService.getBestResponseForContext(
     leadAge,
     userMessage,
-    determineConversationStageFromHistory(messages)
+    determineConversationStageFromHistory(conversationMessages)
   );
 
   if (learnedResponse) {
@@ -323,7 +356,7 @@ async function generateBotResponse(
     };
   }
 
-  // Fall back to AI with enhanced context including lead age
+  // Fall back to AI with enhanced context including lead age  
   const context = {
     leadInfo: {
       name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
@@ -332,7 +365,7 @@ async function generateBotResponse(
       leadAge: leadAge.type,
       daysOld: leadAge.daysOld
     },
-    previousMessages: messages.map(msg => ({
+    previousMessages: conversationMessages.map(msg => ({
       role: msg.role.toLowerCase() as 'user' | 'assistant',
       content: msg.content,
       timestamp: msg.createdAt.toISOString(),
@@ -373,6 +406,25 @@ function determineConversationStageFromHistory(messages: Array<{ content: string
   if (messages.length > 6) return 'closing';
   
   return 'objection';
+}
+
+function extractStateFromMetadata(metadata: any): string | undefined {
+  if (!metadata) return undefined;
+  
+  // Try to extract state from various possible fields in Close.io metadata
+  if (metadata.addresses && metadata.addresses[0]?.state) {
+    return metadata.addresses[0].state;
+  }
+  
+  if (metadata.custom && typeof metadata.custom === 'object') {
+    for (const [key, value] of Object.entries(metadata.custom)) {
+      if (key.toLowerCase().includes('state') && typeof value === 'string') {
+        return value;
+      }
+    }
+  }
+  
+  return undefined;
 }
 
 function mapBotTypeToContext(botType: BotType): 'appointment' | 'objection' | 'general' {
