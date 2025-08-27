@@ -5,6 +5,13 @@ import { smsQueue } from '@/lib/queue';
 import { CloseWebhookPayload } from '@/types';
 
 export async function POST(req: NextRequest) {
+  console.log('🔔 WEBHOOK HIT - /api/webhooks/close');
+  console.log('🔍 Headers:', {
+    'close-sig-hash': req.headers.get('close-sig-hash'),
+    'close-sig-timestamp': req.headers.get('close-sig-timestamp'),
+    'content-type': req.headers.get('content-type'),
+  });
+  
   try {
     const signature = req.headers.get('close-sig-hash');
     const timestamp = req.headers.get('close-sig-timestamp');
@@ -23,6 +30,12 @@ export async function POST(req: NextRequest) {
     // }
 
     const payload: CloseWebhookPayload = JSON.parse(body);
+    console.log('📦 Webhook payload:', {
+      object_type: payload.event?.object_type,
+      action: payload.event?.action,
+      direction: payload.event?.data?.direction,
+      text: payload.event?.data?.text?.substring(0, 100)
+    });
     
     // Store webhook event for processing
     const webhookEvent = await prisma.webhookEvent.create({
