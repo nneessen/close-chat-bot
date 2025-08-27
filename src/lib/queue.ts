@@ -3,37 +3,25 @@ import Redis from 'ioredis';
 import { processSMSWebhook } from '@/services/sms-processor';
 import { processCalendlyWebhook } from '@/services/calendly-processor';
 
-// Parse Redis URL for authentication
-const parseRedisUrl = (url: string) => {
-  try {
-    const redisUrl = new URL(url);
-    return {
-      host: redisUrl.hostname,
-      port: parseInt(redisUrl.port || '6379'),
-      password: redisUrl.password || undefined,
-      username: redisUrl.username || 'default',
-    };
-  } catch {
-    // Fallback for local development
-    return {
-      host: 'localhost',
-      port: 6379,
-    };
-  }
+// Create Redis connections with proper authentication handling
+// ioredis automatically parses redis:// URLs including auth
+const createRedisConnection = () => {
+  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  console.log('🔗 Connecting to Redis:', redisUrl.replace(/:[^:@]*@/, ':***@')); // Log URL without password
+  
+  return new Redis(redisUrl, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    }
+  });
 };
 
-const redisConfig = parseRedisUrl(process.env.REDIS_URL!);
-
 // Create separate connections for queue and worker (BullMQ requirement)
-const queueConnection = new Redis({
-  ...redisConfig,
-  maxRetriesPerRequest: null,
-});
-
-const workerConnection = new Redis({
-  ...redisConfig,
-  maxRetriesPerRequest: null,
-});
+const queueConnection = createRedisConnection();
+const workerConnection = createRedisConnection();
 
 // SMS processing queue
 export const smsQueue = new Queue('sms-processing', { connection: queueConnection });
