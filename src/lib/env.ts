@@ -62,9 +62,11 @@ function validateEnv(): Env {
   }
 }
 
-// Only validate required env vars at runtime, not during build
-export const env = typeof window === 'undefined' && process.env.NODE_ENV === 'production' && process.env.RAILWAY_ENVIRONMENT_NAME
-  ? validateEnv()
-  : envSchema.partial().parse(process.env) as Env;
+// Skip validation during build process, only validate at actual runtime
+export const env = process.env.SKIP_ENV_VALIDATION === 'true'
+  ? envSchema.partial().parse(process.env) as Env
+  : (typeof window === 'undefined' && process.env.NODE_ENV === 'production' && process.argv?.[1]?.includes('next-server'))
+    ? validateEnv()
+    : envSchema.partial().parse(process.env) as Env;
 
 export default env;
