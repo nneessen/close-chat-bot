@@ -1,27 +1,50 @@
 {
-  "name": "temp-app",
+  "name": "close-chat-bot",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No tests specified yet\"",
+    "test:watch": "echo \"No tests specified yet\"",
+    "test:coverage": "echo \"No tests specified yet\"",
+    "db:migrate": "npx prisma migrate dev",
+    "db:generate": "npx prisma generate",
+    "db:studio": "npx prisma studio",
+    "db:reset": "npx prisma migrate reset",
+    "db:seed": "npx prisma db seed",
+    "setup": "./scripts/setup-dev.sh",
+    "setup-db": "./scripts/quick-db-setup.sh",
+    "test-connections": "node scripts/test-connections.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@sentry/nextjs": "^10.6.0",
+    "axios": "^1.11.0",
+    "bullmq": "^5.58.2",
+    "dotenv": "^17.2.1",
+    "ioredis": "^5.7.0",
+    "next": "15.5.2",
+    "ngrok": "^5.0.0-beta.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.2"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@prisma/client": "^6.15.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/faker": "^6.6.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
-    "@eslint/eslintrc": "^3"
+    "prisma": "^6.15.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

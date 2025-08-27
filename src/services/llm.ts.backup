@@ -1,0 +1,205 @@
+import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+import { ConversationContext, LLMResponse } from '@/types';
+import env from '@/lib/env';
+import { prisma } from '@/lib/prisma';
+import { BotType } from '@prisma/client';
+
+class LLMService {
+  private openai?: OpenAI;
+  private anthropic?: Anthropic;
+
+  constructor() {
+    if (env.OPENAI_API_KEY) {
+      this.openai = new OpenAI({
+        apiKey: env.OPENAI_API_KEY,
+      });
+    }
+
+    if (env.ANTHROPIC_API_KEY) {
+      this.anthropic = new Anthropic({
+        apiKey: env.ANTHROPIC_API_KEY,
+      });
+    }
+  }
+
+  async generateResponse(
+    userMessage: string,
+    context: ConversationContext
+  ): Promise<LLMResponse | null> {
+    try {
+      // Get the appropriate prompt template
+      const promptTemplate = await this.getPromptTemplate(context.botType);
+      
+      if (!promptTemplate) {
+        console.error(`No prompt template found for bot type: ${context.botType}`);
+        return null;
+      }
+
+      // Build the system prompt with context
+      const systemPrompt = this.buildSystemPrompt(promptTemplate.content, context);
+      
+      // Build conversation history
+      const messages = this.buildMessageHistory(context.previousMessages, systemPrompt);
+      messages.push({ role: 'user', content: userMessage });
+
+      let response: LLMResponse;
+
+      if (env.LLM_PROVIDER === 'anthropic' && this.anthropic) {
+        response = await this.generateAnthropicResponse(messages);
+      } else if (env.LLM_PROVIDER === 'openai' && this.openai) {
+        response = await this.generateOpenAIResponse(messages);
+      } else {
+        throw new Error(`LLM provider ${env.LLM_PROVIDER} not configured`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('LLM generation error:', error);
+      return null;
+    }
+  }
+
+  private async generateOpenAIResponse(
+    messages: Array<{ role: string; content: string }>
+  ): Promise<LLMResponse> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const completion = await this.openai.chat.completions.create({
+      model: env.LLM_MODEL || 'gpt-4-turbo-preview',
+      messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+      max_tokens: 500,
+      temperature: 0.7,
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1,
+    });
+
+    const choice = completion.choices[0];
+    
+    return {
+      content: choice.message.content || '',
+      tokens: completion.usage?.total_tokens || 0,
+      finishReason: choice.finish_reason || 'stop',
+      model: completion.model,
+    };
+  }
+
+  private async generateAnthropicResponse(
+    messages: Array<{ role: string; content: string }>
+  ): Promise<LLMResponse> {
+    if (!this.anthropic) {
+      throw new Error('Anthropic client not initialized');
+    }
+
+    // Anthropic expects system message separately
+    const systemMessage = messages.find(m => m.role === 'system')?.content || '';
+    const conversationMessages = messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      }));
+
+    const response = await this.anthropic.messages.create({
+      model: env.LLM_MODEL || 'claude-3-opus-20240229',
+      system: systemMessage,
+      messages: conversationMessages as Anthropic.MessageParam[],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const content = response.content[0];
+    
+    return {
+      content: content.type === 'text' ? content.text : '',
+      tokens: response.usage.input_tokens + response.usage.output_tokens,
+      finishReason: response.stop_reason || 'stop',
+      model: response.model,
+    };
+  }
+
+  private async getPromptTemplate(botType: string) {
+    // Convert context botType to database enum
+    const dbBotType: BotType = botType === 'appointment' ? BotType.APPOINTMENT : 
+                               botType === 'objection' ? BotType.OBJECTION_HANDLER : 
+                               BotType.GENERAL;
+    
+    return await prisma.promptTemplate.findFirst({
+      where: {
+        botType: dbBotType,
+        isActive: true,
+      },
+      orderBy: {
+        version: 'desc',
+      },
+    });
+  }
+
+  private buildSystemPrompt(template: string, context: ConversationContext): string {
+    let prompt = template;
+
+    // Replace variables in the template
+    const variables = {
+      leadName: context.leadInfo?.name || 'there',
+      leadEmail: context.leadInfo?.email || '',
+      leadPhone: context.leadInfo?.phone || '',
+      botType: context.botType,
+      currentDate: new Date().toLocaleDateString(),
+      currentTime: new Date().toLocaleTimeString(),
+    };
+
+    Object.entries(variables).forEach(([key, value]) => {
+      prompt = prompt.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    });
+
+    return prompt;
+  }
+
+  private buildMessageHistory(
+    messages: ConversationContext['previousMessages'],
+    systemPrompt: string
+  ): Array<{ role: string; content: string }> {
+    const history = [{ role: 'system', content: systemPrompt }];
+    
+    // Add previous messages (limit to prevent context overflow)
+    const recentMessages = messages.slice(-8); // Last 8 messages
+    
+    for (const msg of recentMessages) {
+      history.push({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+      });
+    }
+
+    return history;
+  }
+
+  // Utility method for testing different prompts
+  async testPrompt(
+    prompt: string,
+    userMessage: string
+  ): Promise<LLMResponse | null> {
+    // Create temporary template
+    const messages = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: userMessage },
+    ];
+
+    try {
+      if (env.LLM_PROVIDER === 'anthropic' && this.anthropic) {
+        return await this.generateAnthropicResponse(messages);
+      } else if (env.LLM_PROVIDER === 'openai' && this.openai) {
+        return await this.generateOpenAIResponse(messages);
+      } else {
+        throw new Error(`LLM provider ${env.LLM_PROVIDER} not configured`);
+      }
+    } catch (error) {
+      console.error('Prompt test error:', error);
+      return null;
+    }
+  }
+}
+
+export const llmService = new LLMService();

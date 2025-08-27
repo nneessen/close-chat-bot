@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id           String         @id @default(cuid())
+  closeId      String         @unique
+  phone        String
+  firstName    String?
+  lastName     String?
+  email        String?
+  status       String         @default("active")
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  conversations Conversation[]
+  appointments Appointment[]
+
+  @@index([closeId])
+  @@index([phone])
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  leadId        String
+  lead          Lead      @relation(fields: [leadId], references: [id])
+  sessionId     String    @unique @default(cuid())
+  botType       BotType
+  status        ConversationStatus @default(active)
+  context       Json?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+
+  @@index([leadId])
+  @@index([sessionId])
+  @@index([status])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  role           MessageRole
+  content        String       @db.Text
+  metadata       Json?
+  closeActivityId String?     @unique
+  tokens         Int?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([closeActivityId])
+}
+
+model Appointment {
+  id            String   @id @default(cuid())
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id])
+  calendlyEventId String @unique
+  scheduledAt   DateTime
+  duration      Int      // in minutes
+  status        String   @default("scheduled")
+  eventType     String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([calendlyEventId])
+  @@index([status])
+}
+
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  source    String   // "close" or "calendly"
+  eventType String
+  payload   Json
+  processed Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([source, processed])
+  @@index([createdAt])
+}
+
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  botType     BotType
+  content     String   @db.Text
+  variables   Json?    // Variables that can be replaced in the prompt
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+  performance Json?    // Track conversion rates, success metrics
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([botType, isActive])
+  @@index([name])
+}
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+model ConversationPattern {
+  id                String   @id @default(cuid())
+  patternId         String   @unique // External reference ID
+  leadAgeType       String   // 'fresh' or 'aged'
+  leadAgeDays       Int      // How many days old the lead was
+  triggerPhrase     String   // What the lead said that triggered this response
+  successfulResponse String  // Your response that worked
+  leadReaction      String   // How they responded to your message
+  effectiveness     String   // 'high', 'medium', 'low'
+  conversationStage String   // 'opening', 'objection', 'qualification', 'appointment_setting', 'closing'
+  outcome           String   // 'responded_positively', 'booked_appointment', 'went_silent', 'objected'
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([leadAgeType, effectiveness])
+  @@index([conversationStage, effectiveness])
+  @@index([outcome])
+}
+
+model ConversationInsight {
+  id                String   @id @default(cuid())
+  pattern           String   // Normalized pattern text
+  effectiveness     Float    // 0.0 to 1.0 success rate
+  leadAgePreference String   // 'fresh', 'aged', 'both'
+  usageFrequency    Int      // How often this pattern appears
+  avgResponseTime   Float?   // Average response time in minutes
+  conversionRate    Float    // Rate of positive outcomes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([effectiveness])
+  @@index([leadAgePreference])
+}
+
+enum BotType {
+  APPOINTMENT
+  OBJECTION_HANDLER
+  GENERAL
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ConversationStatus {
+  active
+  completed
+  failed
+  timeout
+}

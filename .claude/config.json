@@ -1,0 +1,55 @@
+{
+  "project_name": "close-chat-bot",
+  "description": "Close.io SMS Chatbot System with automated responses and appointment booking",
+  "agents": [
+    "sms-bot-specialist",
+    "close-api-specialist", 
+    "database-manager",
+    "test-automator",
+    "security-auditor"
+  ],
+  "commands": [
+    "update-docs"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-commit.sh",
+            "env": {
+              "CLAUDE_TOOLS_USED": "{{tools_used}}"
+            }
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-commit.sh",
+            "env": {
+              "CLAUDE_TOOLS_USED": "Session Complete"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "auto_commit": {
+    "enabled": true,
+    "message_format": "feat: {description}\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
+  },
+  "documentation": {
+    "auto_update": true,
+    "files": [
+      "README.md",
+      "CLAUDE.md", 
+      "TESTING_GUIDE.md"
+    ]
+  }
+}
