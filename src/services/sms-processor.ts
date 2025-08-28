@@ -160,8 +160,13 @@ async function handleInboundSMS(smsData: { [key: string]: unknown; id: string })
     };
     console.log('📋 SMS Parameters:', smsParams);
     
-    await closeService.sendSMS(smsParams);
-    console.log('✅ SMS sent successfully!');
+    try {
+      await closeService.sendSMS(smsParams);
+      console.log('✅ SMS sent successfully!');
+    } catch (smsError) {
+      console.error('❌ CRITICAL: Failed to send SMS response:', smsError);
+      throw smsError; // Re-throw to ensure error is visible
+    }
 
     // Update conversation
     await prisma.conversation.update({
