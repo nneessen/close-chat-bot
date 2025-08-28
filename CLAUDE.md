@@ -564,5 +564,6 @@ These rules must be followed for all development tasks to ensure highest quality
 16. **One task focus**: Mark tasks in_progress individually, complete before moving on
 17. **Match conventions**: Follow existing code style, naming, and architecture patterns
 18. **Minimal communication**: Keep responses concise unless detail is specifically requested
+19. **Complete instructions**: Always provide complete step-by-step instructions including: push code, wait for deployment, then test. Never give incomplete instructions that require the user to infer missing steps.
 
 These rules ensure consistent, high-quality development while maintaining system reliability and preventing technical debt.
