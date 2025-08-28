@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.text();
     console.log('📄 Raw body length:', body.length);
+    console.log('📄 FULL RAW BODY FOR DEBUGGING:', body);
     console.log('📄 Raw body preview:', body.substring(0, 200) + '...');
     
     // Verify webhook signature (log but don't reject for debugging)
