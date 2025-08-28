@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { smsQueue } from '../../../lib/queue';
 
 export async function GET() {
   try {
@@ -34,12 +35,7 @@ export async function GET() {
       }
     };
 
-    // Dynamic import to avoid loading queue during build
-    const { getSmsQueue } = await import('@/lib/queue-noop');
-    const smsQueue = await getSmsQueue();
-    if (!smsQueue) {
-      throw new Error('SMS Queue not initialized');
-    }
+    // Use the imported smsQueue directly
     const job = await smsQueue.add('process-sms', {
       webhookEventId: 'test-event-id',
       payload: testPayload,
