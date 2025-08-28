@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { smsQueue } from '@/lib/queue';
+import { getSmsQueue } from '@/lib/queue-lazy';
 
 export async function GET() {
   try {
@@ -35,6 +35,10 @@ export async function GET() {
       }
     };
 
+    const smsQueue = getSmsQueue();
+    if (!smsQueue) {
+      throw new Error('SMS Queue not initialized');
+    }
     const job = await smsQueue.add('process-sms', {
       webhookEventId: 'test-event-id',
       payload: testPayload,

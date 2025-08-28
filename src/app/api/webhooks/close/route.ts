@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { smsQueue } from '@/lib/queue';
+import { getSmsQueue } from '@/lib/queue-lazy';
 import { CloseWebhookPayload } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -114,6 +114,10 @@ export async function POST(req: NextRequest) {
       
       console.log('🔄 Adding SMS job to queue...');
       try {
+        const smsQueue = getSmsQueue();
+        if (!smsQueue) {
+          throw new Error('SMS Queue not initialized - check Redis connection');
+        }
         const job = await smsQueue.add('process-sms', {
           webhookEventId: webhookEvent?.id || 'temp-' + Date.now(),
           payload,

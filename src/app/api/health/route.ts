@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/queue';
+import { redis } from '@/lib/queue-lazy';
 import { closeService } from '@/services/close';
 import env from '@/lib/env';
 
@@ -24,9 +24,14 @@ export async function GET() {
 
   // Redis check
   try {
-    await redis.ping();
-    checks.redis.status = 'ok';
-    checks.redis.details = 'Connected to Redis successfully';
+    if (redis) {
+      await redis.ping();
+      checks.redis.status = 'ok';
+      checks.redis.details = 'Connected to Redis successfully';
+    } else {
+      checks.redis.status = 'error';
+      checks.redis.details = 'Redis connection not initialized';
+    }
   } catch (error) {
     checks.redis.status = 'error';
     checks.redis.details = error instanceof Error ? error.message : 'Redis connection failed';

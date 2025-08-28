@@ -5,16 +5,19 @@ import { prisma } from '@/lib/prisma';
 import { BotType } from '@prisma/client';
 
 class LLMService {
-  private anthropic: Anthropic;
+  private anthropic: Anthropic | null = null;
 
-  constructor() {
-    if (!env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY is required');
+  private getAnthropic() {
+    if (!this.anthropic) {
+      if (!env.ANTHROPIC_API_KEY) {
+        throw new Error('ANTHROPIC_API_KEY is required');
+      }
+      
+      this.anthropic = new Anthropic({
+        apiKey: env.ANTHROPIC_API_KEY,
+      });
     }
-    
-    this.anthropic = new Anthropic({
-      apiKey: env.ANTHROPIC_API_KEY,
-    });
+    return this.anthropic;
   }
 
   async generateResponse(
@@ -91,7 +94,7 @@ class LLMService {
         content: m.content,
       }));
 
-    const response = await this.anthropic.messages.create({
+    const response = await this.getAnthropic().messages.create({
       model: env.LLM_MODEL || 'claude-3-5-sonnet-20241022',
       system: systemMessage,
       messages: conversationMessages as Anthropic.MessageParam[],

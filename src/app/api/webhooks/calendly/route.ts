@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { calendlyQueue } from '@/lib/queue';
+import { getCalendlyQueue } from '@/lib/queue-lazy';
 import { CalendlyWebhookPayload } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -32,10 +32,13 @@ export async function POST(req: NextRequest) {
     });
 
     // Process Calendly events
-    await calendlyQueue.add('process-calendly', {
-      webhookEventId: webhookEvent.id,
-      payload,
-    });
+    const calendlyQueue = getCalendlyQueue();
+    if (calendlyQueue) {
+      await calendlyQueue.add('process-calendly', {
+        webhookEventId: webhookEvent.id,
+        payload,
+      });
+    }
 
     return NextResponse.json({ success: true, eventId: webhookEvent.id });
   } catch (error) {
