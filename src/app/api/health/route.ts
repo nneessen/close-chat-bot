@@ -23,18 +23,31 @@ export async function GET() {
     bot: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '', enabled: false },
   };
 
-  // Database check
+  // Database check with comprehensive URL debugging
   try {
-    console.log('🔍 DATABASE_URL at runtime:', process.env.DATABASE_URL?.substring(0, 50) + '...');
+    const dbUrls = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      RAILWAY_DATABASE_URL: process.env.RAILWAY_DATABASE_URL,
+      DATABASE_PRIVATE_URL: process.env.DATABASE_PRIVATE_URL,
+      POSTGRES_URL: process.env.POSTGRES_URL,
+    };
+    
+    console.log('🔍 All database URLs available:', Object.entries(dbUrls)
+      .filter(([, url]) => url)
+      .map(([key, url]) => `${key}: ${url?.substring(0, 50)}...`)
+      .join(', '));
+    
     console.log('🔍 SKIP_ENV_VALIDATION:', process.env.SKIP_ENV_VALIDATION);
+    console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
+    
     await prisma.$queryRaw`SELECT 1`;
     checks.database.status = 'ok';
-    checks.database.details = 'Connected to database successfully';
+    checks.database.details = `Connected successfully. URL: ${process.env.DATABASE_URL?.substring(0, 50)}...`;
   } catch (error) {
     checks.database.status = 'error';
     checks.database.details = error instanceof Error ? error.message : 'Database connection failed';
     console.error('❌ Database connection error:', error);
-    console.log('🔍 Actual DATABASE_URL being used:', process.env.DATABASE_URL);
+    console.log('🔍 Full error details:', JSON.stringify(error, null, 2));
   }
 
   // Redis check

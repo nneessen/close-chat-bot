@@ -10,8 +10,9 @@ COPY prisma ./prisma/
 # Install dependencies without cache to avoid EBUSY error
 RUN npm ci --no-cache
 
-# Copy source code
+# Copy source code but exclude .env files that could override Railway variables
 COPY . .
+RUN rm -f .env* || true
 
 # Generate Prisma client and build
 RUN npx prisma generate

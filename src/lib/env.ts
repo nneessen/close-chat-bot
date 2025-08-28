@@ -67,4 +67,29 @@ export const env = process.env.SKIP_ENV_VALIDATION === 'true'
   ? {} as Env 
   : validateEnv();
 
+// Helper function to get DATABASE_URL with Railway fallbacks
+export function getDatabaseUrl(): string {
+  // Try multiple Railway environment variable patterns
+  const urls = [
+    process.env.DATABASE_URL,
+    process.env.RAILWAY_DATABASE_URL,
+    process.env.DATABASE_PRIVATE_URL,
+    process.env.POSTGRES_URL
+  ].filter(Boolean);
+  
+  if (urls.length === 0) {
+    throw new Error('No DATABASE_URL found in environment variables');
+  }
+  
+  // In production, ensure we don't use localhost
+  const dbUrl = urls[0]!;
+  if (process.env.NODE_ENV === 'production' && dbUrl.includes('localhost')) {
+    console.error('🚨 CRITICAL: Production using localhost database!');
+    console.error('Available URLs:', urls);
+    throw new Error('Production environment cannot use localhost database');
+  }
+  
+  return dbUrl;
+}
+
 export default env;
