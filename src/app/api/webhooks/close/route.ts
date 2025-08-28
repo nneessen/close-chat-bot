@@ -89,13 +89,13 @@ export async function POST(req: NextRequest) {
         });
         console.log('✅ Webhook event stored successfully:', webhookEvent.id);
       }
-    } catch (dbError) {
+    } catch (dbError: any) {
       console.error('❌ Database error storing webhook event:', dbError);
       
       // Simple fallback - just continue without storing the event if it's a duplicate
-      if (dbError.code === 'P2002') {
+      if (dbError?.code === 'P2002') {
         console.log('🔄 Duplicate constraint error, continuing with mock webhook event...');
-        webhookEvent = { id: 'duplicate-' + Date.now() };
+        webhookEvent = { id: 'duplicate-' + Date.now() } as any;
       } else {
         throw dbError;
       }
