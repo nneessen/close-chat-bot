@@ -192,7 +192,8 @@ class CalendlyService {
       }
       
       // Generate hourly slots between 9 AM and 6 PM for the date range
-      for (let d = new Date(start); d <= searchEnd; d.setDate(d.getDate() + 1)) {
+      let dayCount = 0;
+      for (let d = new Date(start); d <= searchEnd && dayCount < 7; d = new Date(d.getTime() + 24 * 60 * 60 * 1000), dayCount++) {
         // Skip weekends
         if (d.getDay() === 0 || d.getDay() === 6) continue;
         
@@ -228,6 +229,7 @@ class CalendlyService {
       }
       
       console.log(`🕐 Found ${availableTimes.length} available slots matching preferences:`, preferences);
+      console.log('🗓️ Generated slots:', availableTimes.slice(0, 5).map(time => new Date(time).toLocaleString()));
       return availableTimes.slice(0, 3); // Return first 3 available slots
     } catch (error) {
       console.error('Failed to get available times:', error);
@@ -367,6 +369,7 @@ class CalendlyService {
       const availableTimes = await this.getAvailableTimes(eventTypeUri, startDate, endDate, preferences);
       
       if (availableTimes.length === 0) {
+        console.log('⚠️ No available times found - using fallback response');
         return "I don't have any immediate availability, but let me check my calendar manually. What times work best for you this week?";
       }
 

@@ -17,7 +17,7 @@ An intelligent SMS chatbot system that integrates with Close.io CRM and Calendly
 
 - **Close.io CRM**: Complete SMS activity management, lead tracking, and webhook handling
 - **Calendly**: Appointment scheduling, availability checking, and event management
-- **OpenAI/Claude**: Advanced LLM integration for natural conversation
+- **OpenAI/Claude**: Advanced LLM integration for natural conversation (upgraded to Claude Sonnet 4)
 - **PostgreSQL**: Robust data storage with Prisma ORM
 - **Redis + BullMQ**: Reliable queue system for webhook processing
 
@@ -130,6 +130,7 @@ OPENAI_API_KEY="your_openai_api_key"
 # OR
 ANTHROPIC_API_KEY="your_anthropic_api_key"
 LLM_PROVIDER="openai"  # or "anthropic"
+LLM_MODEL="claude-sonnet-4-20250514"  # Latest Claude Sonnet 4 model
 ```
 
 ### Webhook Setup
@@ -279,11 +280,19 @@ This project includes comprehensive Claude Code configurations with specialized 
 
 ### 🤖 Specialized Subagents
 
+#### **Core System Agents**
 - **sms-bot-specialist**: SMS processing, bot logic, and LLM integration improvements
 - **close-api-specialist**: Close.io CRM API integration, webhook handling, and lead management
 - **database-manager**: Prisma schema management, migrations, and query optimization
 - **test-automator**: Comprehensive testing, error detection, and quality assurance
 - **security-auditor**: Security vulnerabilities, webhook security, and compliance monitoring
+
+#### **NEW: Advanced LLM & Sales Agents**
+- **appointment-llm-specialist**: Expert in LLM-powered appointment booking chatbot design, conversation flows, and edge case handling
+- **objection-handler-specialist**: Expert in life insurance sales objection handling, reframing techniques, and response template systems
+
+#### **Supporting Agents**
+- **api-integrator**, **test-runner**, **performance-optimizer**, **documentation-updater**: Additional specialized support agents
 
 ### ⚡ Slash Commands
 
@@ -301,8 +310,11 @@ This project includes comprehensive Claude Code configurations with specialized 
 ### 🚀 Benefits
 
 - **Faster Development**: Domain-specific subagents handle specialized tasks more efficiently
+- **Advanced LLM Integration**: Latest Claude Sonnet 4 model provides improved conversation quality and performance
+- **Specialized Expertise**: Dedicated agents for appointment booking and objection handling optimization
 - **Always Updated Docs**: Documentation automatically stays current with code changes
 - **Quality Assurance**: Automated checks prevent committing broken code
+- **Build Reliability**: Checkpoint system ensures reliable deployment restoration points
 - **Seamless Workflow**: Intelligent automation reduces manual overhead
 
 ## 🛡 Security
@@ -332,6 +344,31 @@ This project includes comprehensive Claude Code configurations with specialized 
 3. Make your changes
 4. Run tests and linting
 5. Submit a pull request
+
+## 📋 Build Checkpoint System
+
+The project maintains a comprehensive build checkpoint system for reliable deployment restoration:
+
+### Build Tracking
+- **BUILD_CHECKPOINTS.md**: Documents successful builds with working configurations
+- **Restoration Points**: Easy rollback to known working states
+- **Health Validation**: Verified Railway deployment and health check status
+- **Feature Documentation**: Clear record of features at each checkpoint
+
+### Using Checkpoints
+```bash
+# Restore to latest working version
+git reset --hard 0fc1731
+
+# View checkpoint history
+cat BUILD_CHECKPOINTS.md
+```
+
+### Benefits
+- **Reliable Deployments**: Quick restoration if builds fail
+- **Development Safety**: Known working configurations documented
+- **Feature Tracking**: Clear history of working feature implementations
+- **Railway Compatibility**: Verified deployment configurations
 
 ## 🐛 Troubleshooting
 

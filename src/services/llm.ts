@@ -95,7 +95,7 @@ class LLMService {
       }));
 
     const response = await this.getAnthropic().messages.create({
-      model: env.LLM_MODEL || 'claude-3-5-sonnet-20241022',
+      model: env.LLM_MODEL,
       system: systemMessage,
       messages: conversationMessages as Anthropic.MessageParam[],
       max_tokens: 500,

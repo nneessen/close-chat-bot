@@ -16,7 +16,7 @@ This is an automated SMS chatbot system that integrates with Close.io CRM and Ca
 - **Backend**: Next.js 14 with App Router, TypeScript
 - **Database**: PostgreSQL with Prisma ORM
 - **Queue**: Redis with BullMQ for webhook processing
-- **LLM**: OpenAI GPT-4 or Anthropic Claude integration
+- **LLM**: OpenAI GPT-4 or Anthropic Claude integration (upgraded to Claude Sonnet 4)
 - **APIs**: Close.io CRM API, Calendly API v2
 
 ## File Structure
@@ -43,8 +43,20 @@ src/
 │   └── calendly-processor.ts          # Calendly webhook processor
 ├── types/
 │   └── index.ts                       # TypeScript type definitions
+├── BUILD_CHECKPOINTS.md               # Build checkpoint tracking system
 └── .claude/
     ├── agents/                        # Custom subagents
+    │   ├── appointment-llm-specialist.md    # NEW: LLM appointment booking expert
+    │   ├── objection-handler-specialist.md  # NEW: Life insurance objection handling expert
+    │   ├── sms-bot-specialist.md           # SMS processing and bot logic
+    │   ├── close-api-specialist.md         # Close.io CRM integration
+    │   ├── database-manager.md             # Database and schema management
+    │   ├── test-automator.md               # Testing and quality assurance
+    │   ├── security-auditor.md             # Security and compliance
+    │   ├── api-integrator.md               # API integration expertise
+    │   ├── test-runner.md                  # Test execution and automation
+    │   ├── performance-optimizer.md        # Performance analysis and optimization
+    │   └── documentation-updater.md        # Documentation maintenance
     ├── commands/                      # Slash commands
     ├── hooks/                         # Auto-commit hooks
     └── config.json                    # Claude Code configuration
@@ -147,11 +159,35 @@ Handles all other conversations with focus on:
 ## Claude Code Integration
 
 ### Specialized Subagents
+
+#### **Core Agents**
 - **sms-bot-specialist**: SMS processing, bot logic, conversation management, and LLM integration
 - **close-api-specialist**: Close.io CRM API integration, webhook handling, and lead management  
 - **database-manager**: Prisma schema management, migrations, query optimization, and data modeling
 - **test-automator**: Comprehensive testing, error detection, quality assurance, and debugging
 - **security-auditor**: Security vulnerability detection, webhook security, and compliance monitoring
+
+#### **NEW: Advanced LLM & Sales Specialists**
+- **appointment-llm-specialist**: Expert in LLM-powered appointment booking chatbot design, conversation flows, edge case handling, and performance optimization
+- **objection-handler-specialist**: Expert in life insurance sales objection handling, reframing techniques, modern sales psychology, and response template systems
+
+#### **Supporting Agents**
+- **api-integrator**: API integration expertise and third-party service connections
+- **test-runner**: Test execution automation and continuous integration
+- **performance-optimizer**: Performance analysis and system optimization
+- **documentation-updater**: Documentation maintenance and technical writing
+
+### Using Specialized Agents
+
+**Appointment LLM Specialist** (`@appointment-llm-specialist`)
+- Use for: LLM conversation flow optimization, appointment booking logic, intent detection improvements
+- Expertise: Natural language time parsing, edge case handling, performance optimization
+- Example: "Optimize the appointment booking conversation flow for better conversion rates"
+
+**Objection Handler Specialist** (`@objection-handler-specialist`)
+- Use for: Life insurance objection handling, sales psychology, response template optimization
+- Expertise: Reframing techniques, conversion optimization, A/B testing response templates
+- Example: "Create better responses for price objections in life insurance sales"
 
 ### Intelligent Slash Commands
 - `/update-docs`: Automatically updates README.md, CLAUDE.md, and TESTING_GUIDE.md based on code changes
@@ -204,6 +240,31 @@ Handles all other conversations with focus on:
 - Modular bot system for easy expansion
 
 ## Recent Improvements (Latest Updates)
+
+### LLM Model Upgrade (Latest)
+- **Claude Sonnet 4 Integration**: Upgraded from deprecated claude-3-5-sonnet-20250106 to latest claude-sonnet-4-20250514
+- **Enhanced Performance**: Improved conversation quality and response accuracy
+- **Better Context Handling**: Advanced conversation context management and intent detection
+- **Optimized Token Usage**: More efficient token consumption with maintained quality
+
+### New Specialized Agents (Latest)
+- **appointment-llm-specialist**: Dedicated expert for appointment booking conversation design
+  - Natural language time parsing and scheduling intelligence
+  - Edge case handling for booking conflicts and ambiguous requests
+  - Performance optimization for conversation efficiency and token usage
+  - Advanced intent detection for appointment-related interactions
+
+- **objection-handler-specialist**: Specialized agent for life insurance sales objection handling
+  - Comprehensive objection database with proven rebuttal strategies
+  - Modern sales psychology integration and reframing techniques
+  - A/B tested response templates optimized for SMS conversion
+  - Strategic conversation flows that bridge objections to appointments
+
+### Build Checkpoint System (Latest)
+- **BUILD_CHECKPOINTS.md**: Comprehensive tracking of successful builds and deployments
+- **Restoration Points**: Easy rollback to verified working configurations
+- **Railway Compatibility**: Documented build requirements for reliable deployment
+- **Feature Documentation**: Clear record of working features at each checkpoint
 
 ### Enhanced Webhook Processing
 - **Duplicate Handling**: Automatic detection and handling of duplicate webhook deliveries
@@ -442,6 +503,34 @@ username: closeApiKey!,
 - `src/app/api/test-queue/route.ts` - Updated queue imports
 
 This comprehensive fix ensures Railway deployments work reliably while maintaining development functionality and build performance.
+
+### Latest Architecture Enhancements
+
+**Advanced LLM Integration**
+```typescript
+// Enhanced LLM configuration with Claude Sonnet 4
+LLM_MODEL: z.string().default('claude-sonnet-4-20250514'),
+LLM_PROVIDER: z.enum(['openai', 'anthropic']).default('anthropic'),
+```
+
+**Specialized Agent Architecture**
+The system now includes domain-specific agents that provide:
+- **Appointment Booking Expertise**: Advanced conversation flow design and intent detection
+- **Objection Handling Mastery**: Psychology-based reframing and conversion optimization
+- **Performance Optimization**: Token usage efficiency and response time optimization
+- **Edge Case Coverage**: Comprehensive handling of booking conflicts and user input variations
+
+**Build Reliability System**
+```bash
+# Quick restoration to working state
+git reset --hard 0fc1731  # Latest verified working build
+
+# Build requirement validation
+- No Redis connections during Next.js build
+- Lazy-loaded queue system with Proxy pattern  
+- Environment variable fallbacks in service constructors
+- Custom Dockerfile with npm ci --no-cache
+```
 
 ## Claude Code Development Rules
 
