@@ -1,26 +1,92 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/queue';
+import { closeService } from '@/services/close';
+import env from '@/lib/env';
 
 export async function GET() {
+  const checks = {
+    database: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
+    redis: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
+    closeio: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
+    environment: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
+  };
+
+  // Database check
   try {
-    // Test database connection
     await prisma.$queryRaw`SELECT 1`;
-    
-    // Test Redis connection
-    await redis.ping();
-    
-    return NextResponse.json({
-      status: 'healthy',
-      database: 'connected',
-      redis: 'connected',
-      timestamp: new Date().toISOString()
-    });
+    checks.database.status = 'ok';
+    checks.database.details = 'Connected to database successfully';
   } catch (error) {
-    return NextResponse.json({
-      status: 'unhealthy',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+    checks.database.status = 'error';
+    checks.database.details = error instanceof Error ? error.message : 'Database connection failed';
   }
+
+  // Redis check
+  try {
+    await redis.ping();
+    checks.redis.status = 'ok';
+    checks.redis.details = 'Connected to Redis successfully';
+  } catch (error) {
+    checks.redis.status = 'error';
+    checks.redis.details = error instanceof Error ? error.message : 'Redis connection failed';
+  }
+
+  // Close.io API check
+  try {
+    // Simple test to check if API key works
+    await closeService.getWebhookSubscriptions();
+    checks.closeio.status = 'ok';
+    checks.closeio.details = 'Close.io API key is valid and working';
+  } catch (error) {
+    checks.closeio.status = 'error';
+    checks.closeio.details = error instanceof Error ? error.message : 'Close.io API connection failed';
+  }
+
+  // Environment variables check
+  try {
+    const requiredVars = [
+      'DATABASE_URL',
+      'REDIS_URL', 
+      'CLOSE_API_KEY',
+      'CLOSE_WEBHOOK_SECRET',
+      'WEBHOOK_ENDPOINT_URL',
+      'LLM_PROVIDER'
+    ];
+    
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      checks.environment.status = 'error';
+      checks.environment.details = `Missing environment variables: ${missingVars.join(', ')}`;
+    } else {
+      checks.environment.status = 'ok';
+      checks.environment.details = 'All required environment variables are set';
+    }
+  } catch (error) {
+    checks.environment.status = 'error';
+    checks.environment.details = error instanceof Error ? error.message : 'Environment check failed';
+  }
+
+  // Overall health status
+  const allOk = Object.values(checks).every(check => check.status === 'ok');
+  const status = allOk ? 200 : 503;
+
+  const response = {
+    status: allOk ? 'healthy' : 'unhealthy',
+    timestamp: new Date().toISOString(),
+    checks,
+    deployment: {
+      environment: process.env.NODE_ENV || 'unknown',
+      version: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+    },
+    urls: {
+      webhook: process.env.WEBHOOK_ENDPOINT_URL,
+      app: process.env.NEXT_PUBLIC_APP_URL,
+    }
+  };
+
+  console.log('🏥 Health check results:', JSON.stringify(response, null, 2));
+
+  return NextResponse.json(response, { status });
 }
