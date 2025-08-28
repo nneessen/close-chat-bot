@@ -68,6 +68,8 @@ export async function processSMSWebhook(
 async function handleInboundSMS(smsData: { [key: string]: unknown; id: string }) {
   console.log('📞 Handling inbound SMS from:', smsData.remote_phone);
   console.log('💬 Message:', smsData.text);
+  console.log('🆔 CRITICAL - SMS Data Lead ID:', smsData.lead_id);
+  console.log('🔍 FULL SMS Data Object:', JSON.stringify(smsData, null, 2));
   
   // Check if bot is enabled
   console.log('🤖 Checking bot status...');
@@ -152,6 +154,9 @@ async function handleInboundSMS(smsData: { [key: string]: unknown; id: string })
 
     // Send response via Close.io
     console.log('📱 Sending SMS via Close.io...');
+    console.log('🆔 CRITICAL - About to send SMS with Lead ID:', smsData.lead_id);
+    console.log('🔍 SMS Data at sending time:', JSON.stringify(smsData, null, 2));
+    
     const smsParams = {
       leadId: smsData.lead_id as string,
       text: response.content,
