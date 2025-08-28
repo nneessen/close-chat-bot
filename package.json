@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "SKIP_ENV_VALIDATION=true prisma generate && next build",
     "postinstall": "prisma generate",
-    "start": "NODE_ENV=production node server.js",
+    "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "echo \"No tests specified yet\"",
@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.60.0",
-    "@prisma/client": "^6.15.0",
     "@sentry/nextjs": "^10.6.0",
     "axios": "^1.11.0",
     "bullmq": "^5.58.2",
@@ -37,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@prisma/client": "^6.15.0",
     "@tailwindcss/postcss": "^4",
     "@types/faker": "^6.6.8",
     "@types/node": "^20",

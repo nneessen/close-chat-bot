@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { closeService } from '@/services/close';
+import { redis } from '@/lib/queue';
 import env from '@/lib/env';
 
 export async function GET() {
@@ -23,17 +24,9 @@ export async function GET() {
 
   // Redis check
   try {
-    // Dynamic import to avoid loading queue during build
-    const { getRedis } = await import('@/lib/queue-noop');
-    const redis = await getRedis();
-    if (redis) {
-      await redis.ping();
-      checks.redis.status = 'ok';
-      checks.redis.details = 'Connected to Redis successfully';
-    } else {
-      checks.redis.status = 'error';
-      checks.redis.details = 'Redis connection not initialized';
-    }
+    await redis.ping();
+    checks.redis.status = 'ok';
+    checks.redis.details = 'Connected to Redis successfully';
   } catch (error) {
     checks.redis.status = 'error';
     checks.redis.details = error instanceof Error ? error.message : 'Redis connection failed';
