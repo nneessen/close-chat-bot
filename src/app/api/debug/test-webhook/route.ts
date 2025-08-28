@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
-import { getSmsQueue } from '@/lib/queue-noop';
 
 export async function POST() {
   const results = {
@@ -41,6 +40,8 @@ export async function POST() {
   try {
     console.log('🔍 Testing queue system...');
     
+    // Dynamic import to avoid loading queue during build
+    const { getSmsQueue } = await import('@/lib/queue-noop');
     const smsQueue = await getSmsQueue();
     if (!smsQueue) {
       throw new Error('SMS Queue not initialized');
@@ -89,6 +90,7 @@ export async function POST() {
       }
     });
 
+    // Use same getSmsQueue function from dynamic import
     const testQueue = await getSmsQueue();
     if (!testQueue) {
       throw new Error('SMS Queue not initialized');

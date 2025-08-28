@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getRedis } from '@/lib/queue-noop';
 import { closeService } from '@/services/close';
 import env from '@/lib/env';
 
@@ -24,6 +23,8 @@ export async function GET() {
 
   // Redis check
   try {
+    // Dynamic import to avoid loading queue during build
+    const { getRedis } = await import('@/lib/queue-noop');
     const redis = await getRedis();
     if (redis) {
       await redis.ping();

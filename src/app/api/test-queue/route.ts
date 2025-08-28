@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getSmsQueue } from '@/lib/queue-noop';
 
 export async function GET() {
   try {
@@ -35,6 +34,8 @@ export async function GET() {
       }
     };
 
+    // Dynamic import to avoid loading queue during build
+    const { getSmsQueue } = await import('@/lib/queue-noop');
     const smsQueue = await getSmsQueue();
     if (!smsQueue) {
       throw new Error('SMS Queue not initialized');

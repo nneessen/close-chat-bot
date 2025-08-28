@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { getSmsQueue } from '@/lib/queue-noop';
+// Queue imported dynamically at runtime
 import { CloseWebhookPayload } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -114,6 +114,8 @@ export async function POST(req: NextRequest) {
       
       console.log('🔄 Adding SMS job to queue...');
       try {
+        // Dynamic import to avoid loading queue during build
+        const { getSmsQueue } = await import('@/lib/queue-noop');
         const smsQueue = await getSmsQueue();
         if (!smsQueue) {
           throw new Error('SMS Queue not initialized - check Redis connection');

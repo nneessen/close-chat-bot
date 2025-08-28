@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { getCalendlyQueue } from '@/lib/queue-noop';
 import { CalendlyWebhookPayload } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -32,6 +31,8 @@ export async function POST(req: NextRequest) {
     });
 
     // Process Calendly events
+    // Dynamic import to avoid loading queue during build
+    const { getCalendlyQueue } = await import('@/lib/queue-noop');
     const calendlyQueue = await getCalendlyQueue();
     if (calendlyQueue) {
       await calendlyQueue.add('process-calendly', {
