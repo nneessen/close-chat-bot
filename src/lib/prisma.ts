@@ -21,7 +21,7 @@ function getPrismaClient() {
             log: ['error', 'warn']
           });
         }
-        return (prismaInstance as any)[prop];
+        return (prismaInstance as unknown as Record<string | symbol, unknown>)[prop];
       }
     });
   }
