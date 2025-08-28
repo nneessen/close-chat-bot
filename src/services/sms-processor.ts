@@ -123,9 +123,14 @@ async function handleInboundSMS(smsData: { [key: string]: unknown; id: string })
     },
   });
 
-  // Generate bot response
-  console.log('🧠 Generating bot response...');
-  const response = await generateBotResponse(conversation.id, smsData.text as string, botType, lead);
+  // TEMPORARY: Skip LLM and send simple response to test SMS sending
+  console.log('🧠 Using temporary simple response to test SMS sending...');
+  const response = {
+    content: `Hi! I received your message: "${smsData.text}". This is a test response to verify SMS sending works.`,
+    tokens: 20,
+    finishReason: 'stop',
+    model: 'test-bypass'
+  };
   
   if (response) {
     console.log('✅ Bot response generated:', response.content.substring(0, 50) + '...');
