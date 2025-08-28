@@ -28,6 +28,9 @@ src/
 │   │   ├── webhooks/
 │   │   │   ├── close/route.ts         # Close.io webhook handler
 │   │   │   └── calendly/route.ts      # Calendly webhook handler
+│   │   ├── health/route.ts            # System health monitoring
+│   │   ├── debug/webhooks/route.ts    # Webhook configuration analysis
+│   │   └── test/route.ts              # Basic connectivity testing
 │   └── dashboard/                     # Admin dashboard (future)
 ├── lib/
 │   ├── prisma.ts                      # Database client
@@ -52,26 +55,47 @@ src/
 ### 1. Webhook Handling
 - **Close.io SMS Webhooks** (`src/app/api/webhooks/close/route.ts`): 
   - Validates webhook signatures
+  - Handles duplicate webhook deliveries automatically
   - Queues SMS messages for processing
   - Handles inbound SMS events
+  - Enhanced logging for debugging
 
 - **Calendly Webhooks** (`src/app/api/webhooks/calendly/route.ts`):
   - Processes appointment bookings and cancellations
   - Updates appointment records in database
 
-### 2. SMS Processing (`src/services/sms-processor.ts`)
+### 2. System Monitoring & Debugging
+- **Health Check Endpoint** (`src/app/api/health/route.ts`):
+  - Comprehensive system health monitoring
+  - Database connectivity verification
+  - Redis connection testing
+  - Close.io API authentication check
+  - Environment variables validation
+  - Deployment information reporting
+
+- **Webhook Debug Endpoint** (`src/app/api/debug/webhooks/route.ts`):
+  - Close.io webhook configuration analysis
+  - URL validation and recommendations
+  - Webhook activation status monitoring
+
+- **Basic Test Endpoint** (`src/app/api/test/route.ts`):
+  - Simple connectivity testing
+  - Environment variable presence check
+  - Basic GET/POST functionality verification
+
+### 3. SMS Processing (`src/services/sms-processor.ts`)
 - Determines bot type based on message content
 - Maintains conversation context
 - Generates LLM responses
 - Sends replies via Close.io API
 
-### 3. LLM Integration (`src/services/llm.ts`)
+### 4. LLM Integration (`src/services/llm.ts`)
 - Supports both OpenAI and Anthropic APIs
 - Prompt template system for customizable bot behavior
 - Context-aware conversation management
 - Token usage optimization
 
-### 4. Database Schema (`prisma/schema.prisma`)
+### 5. Database Schema (`prisma/schema.prisma`)
 - **Lead**: Customer information from Close.io
 - **Conversation**: SMS conversation sessions
 - **Message**: Individual SMS messages with context
@@ -179,19 +203,54 @@ Handles all other conversations with focus on:
 - Database designed for efficient querying
 - Modular bot system for easy expansion
 
+## Recent Improvements (Latest Updates)
+
+### Enhanced Webhook Processing
+- **Duplicate Handling**: Automatic detection and handling of duplicate webhook deliveries
+- **P2002 Error Resolution**: Graceful handling of unique constraint violations in WebhookEvent table
+- **Enhanced Logging**: Comprehensive debugging information for webhook processing pipeline
+- **Error Recovery**: Fallback mechanisms for database operations
+
+### System Monitoring & Health Checks
+- **Comprehensive Health Endpoint**: Real-time monitoring of all system components
+- **Webhook Configuration Analysis**: Debug endpoint for validating Close.io webhook setup
+- **Environment Validation**: Automatic checking of required environment variables
+- **Connectivity Testing**: Simple endpoints for basic system validation
+
+### Improved Error Handling
+- **Database Constraint Errors**: Automatic handling of P2002 unique constraint violations
+- **Webhook Signature Verification**: Enhanced security with better error reporting
+- **Queue Processing**: Improved error tracking and recovery mechanisms
+- **Connection Resilience**: Better handling of database and Redis connection issues
+
 ## Troubleshooting
 
+### System Health Monitoring
+Use the comprehensive health check endpoint to monitor system status:
+```bash
+curl https://your-domain.com/api/health
+```
+
+### Webhook Configuration Debugging
+Analyze webhook setup and get recommendations:
+```bash
+curl https://your-domain.com/api/debug/webhooks
+```
+
 ### Common Issues
-- **Webhook failures**: Check signature verification and endpoint accessibility
-- **Database errors**: Verify connection string and migrations
-- **LLM errors**: Check API keys and rate limits
-- **Queue issues**: Ensure Redis is running and accessible
+- **Webhook failures**: Check signature verification and endpoint accessibility using health endpoints
+- **Database errors**: Verify connection string and migrations; system now handles duplicate processing automatically
+- **LLM errors**: Check API keys and rate limits through health monitoring
+- **Queue issues**: Ensure Redis is running and accessible; validate with health check
+- **P2002 Constraint Errors**: Now handled automatically with duplicate detection
 
 ### Debugging
 - Enable `ENABLE_DEBUG_MODE=true` for detailed logging
+- Use `GET /api/health` for comprehensive system status
+- Use `GET /api/debug/webhooks` for webhook configuration analysis
 - Check webhook event logs in database
 - Monitor queue processing status
-- Review API response logs
+- Review API response logs with enhanced webhook logging
 
 This system is designed to be maintainable, scalable, and easy to extend with new bot functionality or integrations.
 

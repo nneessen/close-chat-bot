@@ -185,6 +185,24 @@ WHERE name = 'appointment-scheduler' AND "botType" = 'APPOINTMENT';
 - `POST /api/webhooks/close` - Close.io SMS webhook handler
 - `POST /api/webhooks/calendly` - Calendly event webhook handler
 
+### System Health & Monitoring
+
+- `GET /api/health` - Comprehensive health check endpoint
+  - Database connectivity status
+  - Redis connection status  
+  - Close.io API validation
+  - Environment variables verification
+  - Deployment information
+
+### Debug & Testing
+
+- `GET /api/debug/webhooks` - Close.io webhook configuration analysis
+  - Lists all configured webhooks
+  - Validates webhook URLs and settings
+  - Provides configuration recommendations
+- `GET /api/test` - Simple connectivity test endpoint
+- `POST /api/test` - Basic POST functionality test
+
 ### Management
 
 - `GET /api/conversations` - List conversations
@@ -320,24 +338,49 @@ This project includes comprehensive Claude Code configurations with specialized 
 ### Common Issues
 
 1. **Webhooks not working**
-   - Verify webhook URLs are accessible
+   - Verify webhook URLs are accessible using `GET /api/health`
    - Check webhook signature verification
    - Ensure environment variables are set correctly
+   - Use `GET /api/debug/webhooks` to validate Close.io webhook configuration
+   - Check for duplicate webhook processing causing P2002 database errors
 
 2. **Database connection errors**
    - Verify DATABASE_URL format
    - Ensure PostgreSQL is running
    - Check database permissions
+   - Use `GET /api/health` to test database connectivity
 
 3. **LLM API errors**
    - Verify API keys are correct
    - Check rate limits and quotas
    - Ensure model names are valid
+   - Monitor token usage in system logs
 
 4. **Redis connection issues**
    - Verify Redis server is running
    - Check REDIS_URL configuration
    - Ensure Redis is accessible from the application
+   - Use `GET /api/health` to test Redis connectivity
+
+5. **Webhook Duplicate Processing**
+   - System now handles duplicate webhook deliveries automatically
+   - P2002 unique constraint errors are gracefully handled
+   - Check logs for "Duplicate webhook detected" messages
+
+### Health Monitoring
+
+Monitor system health with the comprehensive health check endpoint:
+
+```bash
+curl https://your-domain.com/api/health
+```
+
+This endpoint provides:
+- Database connectivity status
+- Redis connection verification
+- Close.io API validation
+- Environment variables check
+- Deployment information
 
 ### Debug Mode
 
@@ -346,6 +389,20 @@ Enable debug mode for detailed logging:
 ```env
 ENABLE_DEBUG_MODE=true
 ```
+
+### Webhook Configuration Debugging
+
+Use the debug endpoint to analyze webhook configuration:
+
+```bash
+curl https://your-domain.com/api/debug/webhooks
+```
+
+This provides:
+- List of all configured webhooks
+- URL validation against expected endpoints
+- Activation status check
+- Configuration recommendations
 
 ## 📄 License
 

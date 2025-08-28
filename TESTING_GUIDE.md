@@ -161,15 +161,67 @@ Once local testing works:
 3. **Set production environment variables**
 4. **Monitor production logs** for any issues
 
+## System Health & Debugging
+
+### Health Check Endpoint
+
+Test all system components with the comprehensive health endpoint:
+
+```bash
+# Local development
+curl http://localhost:3001/api/health
+
+# Production deployment
+curl https://your-domain.com/api/health
+```
+
+This checks:
+- Database connectivity (PostgreSQL)
+- Redis connection status
+- Close.io API authentication
+- Environment variables validation
+- Deployment information
+
+### Webhook Configuration Analysis
+
+Verify Close.io webhook setup:
+
+```bash
+# Check webhook configuration
+curl https://your-domain.com/api/debug/webhooks
+```
+
+This provides:
+- List of all configured webhooks
+- URL validation against expected endpoints
+- Active/inactive status
+- Configuration recommendations
+
+### Simple Connectivity Tests
+
+```bash
+# Basic endpoint test
+curl https://your-domain.com/api/test
+
+# Test POST functionality  
+curl -X POST https://your-domain.com/api/test
+```
+
 ## Troubleshooting Commands
 
 ```bash
-# Check webhook events
+# Check webhook events via Close.io API
 curl -X GET "https://api.close.com/api/v1/webhook/" \
   -u "your_api_key:"
 
-# Test Close.io API connection  
-npm run test-connections
+# System health check (new)
+curl https://your-domain.com/api/health | jq
+
+# Webhook configuration analysis (new)
+curl https://your-domain.com/api/debug/webhooks | jq
+
+# Test basic connectivity (new)
+curl https://your-domain.com/api/test
 
 # Check database connectivity
 npm run db:studio
@@ -177,6 +229,19 @@ npm run db:studio
 # View recent logs
 tail -f /var/log/your-app.log
 ```
+
+### Common Error Patterns
+
+#### P2002 Database Constraint Errors
+- **Issue**: Duplicate webhook processing causing unique constraint violations
+- **Solution**: System now handles duplicates automatically
+- **Log Pattern**: `"Duplicate webhook detected, using existing event"`
+
+#### Health Check Failures
+- **Database Error**: Check DATABASE_URL format and PostgreSQL connection
+- **Redis Error**: Verify REDIS_URL and Redis server status  
+- **Close.io Error**: Validate CLOSE_API_KEY permissions
+- **Environment Error**: Check required environment variables are set
 
 ## Support
 
