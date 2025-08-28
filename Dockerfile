@@ -10,9 +10,12 @@ COPY prisma ./prisma/
 # Install dependencies without cache to avoid EBUSY error
 RUN npm ci --no-cache
 
-# Copy source code but exclude .env files that could override Railway variables
+# Copy source code but exclude .env files that could override Railway variables  
 COPY . .
-RUN rm -f .env* || true
+
+# CRITICAL: Remove ALL local .env files that override Railway environment variables
+RUN rm -f .env .env.local .env.development .env.production .env.test .env.* || true
+RUN ls -la | grep -E "\.env" || echo "No .env files found"
 
 # Generate Prisma client and build
 RUN npx prisma generate
