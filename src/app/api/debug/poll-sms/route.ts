@@ -4,7 +4,7 @@ import { processSMSWebhook } from '@/services/sms-processor';
 
 export async function POST() {
   try {
-    console.log('🔍 Polling Close.io for new inbound SMS messages...');
+    console.log('🔍 [POLL SMS] Polling Close.io for new inbound SMS messages...');
     
     // Get the last processed SMS ID from database
     const lastProcessed = await prisma.message.findFirst({
