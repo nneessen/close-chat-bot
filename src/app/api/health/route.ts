@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/queue-build-safe';
+import { getRedis } from '@/lib/queue-noop';
 import { closeService } from '@/services/close';
 import env from '@/lib/env';
 
@@ -24,6 +24,7 @@ export async function GET() {
 
   // Redis check
   try {
+    const redis = await getRedis();
     if (redis) {
       await redis.ping();
       checks.redis.status = 'ok';

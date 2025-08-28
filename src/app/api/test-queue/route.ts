@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSmsQueue } from '@/lib/queue-build-safe';
+import { getSmsQueue } from '@/lib/queue-noop';
 
 export async function GET() {
   try {
@@ -35,7 +35,7 @@ export async function GET() {
       }
     };
 
-    const smsQueue = getSmsQueue();
+    const smsQueue = await getSmsQueue();
     if (!smsQueue) {
       throw new Error('SMS Queue not initialized');
     }
