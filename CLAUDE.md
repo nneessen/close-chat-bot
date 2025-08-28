@@ -254,6 +254,195 @@ curl https://your-domain.com/api/debug/webhooks
 
 This system is designed to be maintainable, scalable, and easy to extend with new bot functionality or integrations.
 
+## Railway Deployment Troubleshooting
+
+### Build Issues Resolution (August 2024)
+
+This section documents the comprehensive troubleshooting process for Railway deployment build failures and runtime health check issues.
+
+#### Initial Problem
+The application was working perfectly in development but failing during Railway deployment with multiple error patterns:
+
+1. **Early Build Failures (Exit Code 240)** - First 2 seconds of build
+2. **Redis Connection Errors** - 4+ minutes into build during static page generation
+3. **Runtime Health Check Failures** - 503 errors during Railway health checks
+
+#### Root Cause Analysis
+
+**Build-Time Redis Connections**
+```
+Error: connect ECONNREFUSED 127.0.0.1:6379
+💥 Worker error: Error: connect ECONNREFUSED 127.0.0.1:6379
+⏳ Redis retry attempt 1, waiting 50ms...
+```
+
+The core issue was that Redis connections and BullMQ workers were being initialized at module load time during Next.js static page generation. Railway's build environment doesn't have Redis available, causing connection failures.
+
+**Runtime Environment Variables**
+```json
+{
+  "redis": {"status": "error", "details": "Queue connections not available during build"},
+  "closeio": {"status": "error", "details": "Request failed with status code 401"}
+}
+```
+
+The `SKIP_ENV_VALIDATION=true` environment variable was persisting from build-time into runtime, causing the environment validation to return empty objects instead of actual environment variables.
+
+#### Solution Implementation
+
+**1. Lazy-Loaded Queue System**
+Created a build-safe queue implementation using JavaScript Proxies:
+
+```typescript
+// Before: Immediate connection at module load
+const queueConnection = createRedisConnection();
+export const smsQueue = new Queue('sms-processing', { connection: queueConnection });
+
+// After: Lazy-loaded with build-time safety
+export const smsQueue = new Proxy({} as Queue, {
+  get(target, prop) {
+    if (process.env.SKIP_ENV_VALIDATION === 'true') {
+      // Return mock functions during build
+      if (typeof prop === 'string' && ['add', 'close'].includes(prop)) {
+        return () => Promise.resolve({ id: 'build-time-mock' });
+      }
+      return undefined;
+    }
+    
+    if (!smsQueueInstance) {
+      smsQueueInstance = new Queue('sms-processing', { connection: getQueueConnection() });
+      initializeWorkers(); // Auto-initialize workers on first use
+    }
+    return (smsQueueInstance as unknown as Record<string | symbol, unknown>)[prop];
+  }
+});
+```
+
+**2. Build-Safe Connection Management**
+```typescript
+const getQueueConnection = () => {
+  if (!queueConnection) {
+    if (process.env.SKIP_ENV_VALIDATION === 'true') {
+      throw new Error('Queue connections not available during build');
+    }
+    queueConnection = createRedisConnection();
+  }
+  return queueConnection;
+};
+```
+
+**3. Worker Initialization Control**
+```typescript
+let workersInitialized = false;
+
+export const initializeWorkers = () => {
+  if (process.env.NODE_ENV === 'test') return;
+  if (process.env.SKIP_ENV_VALIDATION === 'true') return; // Skip during build
+  if (workersInitialized) return; // Prevent duplicate initialization
+  
+  workersInitialized = true;
+  // Initialize BullMQ workers...
+};
+```
+
+**4. Docker Environment Fix**
+```dockerfile
+# Before: Persistent environment variable
+ENV SKIP_ENV_VALIDATION=true
+RUN npx prisma generate
+RUN npm run build:next
+
+# After: Only during build commands
+RUN npx prisma generate  
+RUN SKIP_ENV_VALIDATION=true npm run build:next
+```
+
+**5. API Service Fallbacks**
+```typescript
+// Before: Only used validated env
+username: env.CLOSE_API_KEY!,
+
+// After: Fallback for build-safe scenarios  
+const closeApiKey = env.CLOSE_API_KEY || process.env.CLOSE_API_KEY;
+username: closeApiKey!,
+```
+
+#### Key Technical Insights
+
+**Build vs Runtime Phases**
+- **Build Phase**: Next.js static page generation requires importing modules but shouldn't connect to external services
+- **Runtime Phase**: Actual application execution when Redis and APIs should be available
+- **Solution**: Use lazy initialization with environment-based guards
+
+**Environment Variable Lifecycle**
+- Railway builds set `SKIP_ENV_VALIDATION=true` to bypass validation during builds
+- This was incorrectly persisting to runtime via `ENV` directive in Dockerfile
+- Fixed by only using it in `RUN` commands, not as persistent environment
+
+**Proxy Pattern Benefits**
+- Allows modules to be imported during build without executing connection logic
+- Provides build-time mock responses for queue operations
+- Defers actual initialization until first runtime usage
+- Maintains the same API interface for consuming code
+
+#### Build Process Flow
+
+**Before Fix:**
+```
+1. Next.js build starts
+2. Imports src/lib/queue.ts
+3. Module loads → createRedisConnection() executes
+4. Redis connection fails (no Redis in build environment)
+5. Build terminates with exit code 240
+```
+
+**After Fix:**
+```
+1. Next.js build starts  
+2. Imports src/lib/queue.ts
+3. Module loads → Proxy created, no connections attempted
+4. Static page generation succeeds
+5. Build completes successfully
+6. Runtime: First webhook → Proxy triggers lazy initialization
+7. Redis connections established, workers start
+```
+
+#### Deployment Checklist
+
+✅ **Build Requirements**
+- `SKIP_ENV_VALIDATION=true` only during `npm run build`
+- No Redis/external service connections during static generation
+- All imports must be build-safe (no immediate connections)
+
+✅ **Runtime Requirements**  
+- Environment variables properly validated and available
+- Redis connections initialize on first use
+- Workers auto-start when queue operations begin
+- Health checks pass for all services
+
+✅ **Dockerfile Best Practices**
+- Use `RUN VARIABLE=value command` not `ENV VARIABLE=value`
+- Separate build-time and runtime environment concerns
+- Custom Dockerfile to avoid Railway cache issues (`npm ci --no-cache`)
+
+#### Files Modified
+
+**Core Queue System**
+- `src/lib/queue.ts` - Lazy-loaded Proxy implementation
+- `src/services/close.ts` - Environment variable fallbacks
+- `src/app/api/health/route.ts` - Runtime connection testing
+
+**Build Configuration**  
+- `Dockerfile` - Removed persistent `ENV SKIP_ENV_VALIDATION`
+- `package.json` - Maintained working `@prisma/client` in devDependencies
+
+**Debug Endpoints**
+- `src/app/api/debug/live-test/route.ts` - Updated queue imports
+- `src/app/api/debug/test-webhook/route.ts` - Updated queue imports  
+- `src/app/api/test-queue/route.ts` - Updated queue imports
+
+This comprehensive fix ensures Railway deployments work reliably while maintaining development functionality and build performance.
+
 ## Claude Code Development Rules
 
 These rules must be followed for all development tasks to ensure highest quality, accuracy, and maintainability:

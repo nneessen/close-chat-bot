@@ -22,7 +22,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   LLM_PROVIDER: z.enum(['openai', 'anthropic']).default('anthropic'),
-  LLM_MODEL: z.string().default('claude-3-5-sonnet-20241022'),
+  LLM_MODEL: z.string().default('claude-3-5-sonnet-20250106'),
   
   // Application
   NEXT_PUBLIC_APP_URL: z.string().url(),

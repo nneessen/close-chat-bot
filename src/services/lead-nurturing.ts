@@ -81,15 +81,21 @@ export class LeadNurturingService {
       return 'opening';
     }
 
-    const lastBotMessage = previousMessages
-      .filter(m => m.role === 'ASSISTANT' || m.role === 'assistant')
-      .pop()?.content.toLowerCase() || '';
+    const botMessages = previousMessages.filter(m => m.role === 'ASSISTANT' || m.role === 'assistant');
+    const userMessages = previousMessages.filter(m => m.role === 'USER' || m.role === 'user');
+    
+    const lastBotMessage = botMessages.pop()?.content.toLowerCase() || '';
+    const lastUserMessage = userMessages.pop()?.content.toLowerCase() || '';
 
-    const lastUserMessage = previousMessages
-      .filter(m => m.role === 'USER' || m.role === 'user')
-      .pop()?.content.toLowerCase() || '';
+    console.log('🔍 Stage detection:', {
+      messageCount: previousMessages.length,
+      botMessageCount: botMessages.length + 1,
+      userMessageCount: userMessages.length + 1,
+      lastBot: lastBotMessage.substring(0, 50),
+      lastUser: lastUserMessage.substring(0, 50)
+    });
 
-    // Check for objection handling patterns FIRST - these override stage progression
+    // Check for objections FIRST - these override stage progression
     if (lastUserMessage.includes('just send me a quote') || 
         lastUserMessage.includes('just email me') ||
         lastUserMessage.includes('send me information') ||
@@ -97,29 +103,45 @@ export class LeadNurturingService {
         lastUserMessage.includes('no thanks') ||
         lastUserMessage.includes('too busy') ||
         lastUserMessage.includes('no time')) {
-      console.log('🚫 Detected objection:', lastUserMessage);
+      console.log('🚫 Detected objection:', lastUserMessage.substring(0, 50));
       return 'objection_handling';
     }
 
-    // Determine stage based on bot's last question (conversation flow)
-    if (lastBotMessage.includes('couple questions before we hop on a call') || 
-        lastBotMessage.includes('do you mind if i ask')) {
-      return 'permission';
-    } else if (lastBotMessage.includes('first policy or') && lastBotMessage.includes('replace coverage')) {
-      return 'first_vs_replacement';
-    } else if ((lastBotMessage.includes('just yourself or') && lastBotMessage.includes('spouse')) ||
-               (lastBotMessage.includes('coverage for both'))) {
-      return 'spouse_coverage';
-    } else if (lastBotMessage.includes('insurance license') && lastBotMessage.includes('email')) {
-      return 'license_confirm';
-    } else if (lastBotMessage.includes('available times') || lastBotMessage.includes('appointment') || 
-               lastBotMessage.includes('call to go over')) {
+    // Progressive stage detection - check in order of conversation flow
+    const allBotContent = botMessages.map(m => m.content.toLowerCase()).join(' ');
+    
+    // Check what we've already covered to prevent going backwards
+    if (allBotContent.includes('available times') || allBotContent.includes('call to go over') || 
+        allBotContent.includes('schedule a') || allBotContent.includes('set up a')) {
       return 'appointment_booking';
     }
+    
+    if (allBotContent.includes('insurance license') && allBotContent.includes('email')) {
+      return 'license_confirm';
+    }
+    
+    if (allBotContent.includes('just yourself or') || allBotContent.includes('spouse') || 
+        allBotContent.includes('coverage for both')) {
+      return 'spouse_coverage';
+    }
+    
+    if (allBotContent.includes('first policy or') || allBotContent.includes('replace coverage')) {
+      return 'first_vs_replacement';
+    }
+    
+    if (allBotContent.includes('couple questions') || allBotContent.includes('do you mind if i ask')) {
+      return 'permission';
+    }
 
-    // If we have messages but can't determine stage, check if we've sent the opening already
-    if (previousMessages.some(m => m.content.includes('Looking forward to speaking'))) {
-      return 'permission'; // Move to permission if we've already introduced ourselves
+    // Default progression based on message count to prevent getting stuck
+    if (previousMessages.length >= 8) return 'appointment_booking';
+    if (previousMessages.length >= 6) return 'license_confirm';
+    if (previousMessages.length >= 4) return 'spouse_coverage';  
+    if (previousMessages.length >= 2) return 'first_vs_replacement';
+    
+    // Check if we've sent opening message
+    if (allBotContent.includes('looking forward to speaking') || allBotContent.includes('assigned to go over')) {
+      return 'permission';
     }
 
     return 'opening';

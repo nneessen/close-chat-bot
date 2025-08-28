@@ -130,6 +130,11 @@ async function handleInboundSMS(smsData: { [key: string]: unknown; id: string })
       },
     });
 
+    // Add natural delay before responding (3-8 seconds to seem more human)
+    const delaySeconds = Math.floor(Math.random() * 5) + 3; // 3-7 seconds
+    console.log(`⏳ Adding ${delaySeconds} second delay before responding...`);
+    await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+
     // Send response via Close.io
     console.log('📱 Sending SMS via Close.io...');
     const smsParams = {
@@ -263,7 +268,70 @@ async function generateBotResponse(
     take: 10,
   });
 
-  // First, try lead nurturing flow for all conversations
+  // Check for duplicate responses to prevent repetition
+  const lastBotMessage = messages
+    .filter(msg => msg.role === MessageRole.ASSISTANT)
+    .pop();
+
+  console.log('🧠 Generating response for:', {
+    userMessage: userMessage.substring(0, 50),
+    botType,
+    messageCount: messages.length,
+    lastBotContent: lastBotMessage?.content.substring(0, 50)
+  });
+
+  // Simple appointment detection
+  const isAppointmentRequest = 
+    botType === BotType.APPOINTMENT || 
+    userMessage.toLowerCase().includes('schedule') ||
+    userMessage.toLowerCase().includes('appointment') ||
+    userMessage.toLowerCase().includes('book') ||
+    userMessage.toLowerCase().includes('available') ||
+    /^[1-9]$/.test(userMessage.trim()); // Time slot selection
+
+  if (isAppointmentRequest) {
+    console.log('📅 Handling appointment request');
+    
+    const appointmentContext = {
+      leadInfo: {
+        name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'there',
+        firstName: lead.firstName || '',
+        lastName: lead.lastName || '',
+        email: lead.email || undefined,
+        phone: lead.phone,
+        leadId: lead.id,
+        state: extractStateFromMetadata(lead.metadata as Record<string, unknown> | null),
+      },
+      userMessage,
+      conversationId,
+      previousMessages: messages.map(msg => ({
+        role: msg.role.toLowerCase() as 'user' | 'assistant',
+        content: msg.content,
+        timestamp: msg.createdAt.toISOString(),
+      })),
+    };
+
+    try {
+      const bookingResult = await appointmentBookingService.handleAppointmentRequest(appointmentContext);
+      
+      // Check for duplicate response
+      if (lastBotMessage && lastBotMessage.content === bookingResult.response) {
+        console.log('⚠️ Duplicate response detected, using fallback');
+        return await generateFallbackResponse(userMessage, lead, messages);
+      }
+      
+      return {
+        content: bookingResult.response,
+        tokens: bookingResult.response.length / 4,
+        finishReason: 'stop',
+        model: 'appointment-booking-system'
+      };
+    } catch (error) {
+      console.error('❌ Appointment booking error:', error);
+    }
+  }
+
+  // Use lead nurturing for conversation flow
   console.log('🎯 Using lead nurturing service');
   
   const nurturingContext = {
@@ -288,33 +356,12 @@ async function generateBotResponse(
   try {
     const nurturingResult = await leadNurturingService.processNurturingFlow(nurturingContext);
     
-    // If we're at appointment booking stage, use appointment service
-    if (nurturingResult.stage === 'appointment_booking' || botType === BotType.APPOINTMENT) {
-      console.log('🤖 Switching to appointment booking service');
-      
-      const appointmentContext = {
-        leadInfo: nurturingContext.leadInfo,
-        userMessage,
-        conversationId,
-        previousMessages: nurturingContext.previousMessages,
-      };
-
-      try {
-        const bookingResult = await appointmentBookingService.handleAppointmentRequest(appointmentContext);
-        
-        return {
-          content: bookingResult.response,
-          tokens: bookingResult.response.length / 4,
-          finishReason: 'stop',
-          model: 'appointment-booking-system'
-        };
-      } catch (error) {
-        console.error('❌ Appointment booking error:', error);
-        // Fall back to nurturing response
-      }
+    // Check for duplicate response
+    if (lastBotMessage && lastBotMessage.content === nurturingResult.response) {
+      console.log('⚠️ Duplicate nurturing response detected, using LLM fallback');
+      return await generateFallbackResponse(userMessage, lead, messages);
     }
-
-    // Return the nurturing service response
+    
     return {
       content: nurturingResult.response,
       tokens: nurturingResult.response.length / 4,
@@ -323,54 +370,33 @@ async function generateBotResponse(
     };
   } catch (error) {
     console.error('❌ Lead nurturing error:', error);
-    // Fall back to existing logic
   }
 
-  // For non-appointment bot or if appointment booking fails, use AI with learned patterns
-  const conversationMessages = await prisma.message.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: 'asc' },
-    take: 10,
-  });
+  // Fallback to AI response
+  return await generateFallbackResponse(userMessage, lead, messages);
+}
 
-  // Determine lead age from Close.io data
-  const closeLeadData = await closeService.getLead(lead.closeId || '');
-  const leadAge = closeLeadData ? calculateLeadAge(closeLeadData.date_created) : { type: 'aged' as const, daysOld: 30 };
+async function generateFallbackResponse(
+  userMessage: string, 
+  lead: Lead, 
+  messages: Array<{ role: MessageRole; content: string; createdAt: Date }>
+) {
+  console.log('🤖 Using LLM fallback response');
   
-  console.log('📊 Lead age:', leadAge);
-
-  // Try to get a successful pattern from your previous conversations
-  const learnedResponse = await conversationLearningService.getBestResponseForContext(
-    leadAge,
-    userMessage,
-    determineConversationStageFromHistory(conversationMessages)
-  );
-
-  if (learnedResponse) {
-    console.log('🎯 Using learned response pattern');
-    return {
-      content: learnedResponse,
-      tokens: learnedResponse.length / 4,
-      finishReason: 'stop',
-      model: 'learned-pattern'
-    };
-  }
-
-  // Fall back to AI with enhanced context including lead age  
   const context = {
     leadInfo: {
-      name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
+      name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'there',
       email: lead.email || undefined,
       phone: lead.phone,
-      leadAge: leadAge.type,
-      daysOld: leadAge.daysOld
+      leadAge: 'unknown' as const,
+      daysOld: 0
     },
-    previousMessages: conversationMessages.map(msg => ({
+    previousMessages: messages.map(msg => ({
       role: msg.role.toLowerCase() as 'user' | 'assistant',
       content: msg.content,
       timestamp: msg.createdAt.toISOString(),
     })),
-    botType: mapBotTypeToContext(botType),
+    botType: 'objection' as const,
   };
 
   return await llmService.generateResponse(userMessage, context);
