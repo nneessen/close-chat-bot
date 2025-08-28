@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
       
       console.log('🔄 Adding SMS job to queue...');
       try {
+        console.log('📝 About to call smsQueue.add...');
         // Use direct queue import like the working commit
         const job = await smsQueue.add('process-sms', {
           webhookEventId: webhookEvent?.id || 'temp-' + Date.now(),

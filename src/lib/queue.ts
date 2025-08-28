@@ -73,8 +73,10 @@ export const smsQueue = new Proxy({} as Queue, {
     
     if (!smsQueueInstance) {
       smsQueueInstance = new Queue('sms-processing', { connection: getQueueConnection() });
-      // Auto-initialize workers when first queue operation happens
-      initializeWorkers();
+      // Initialize workers asynchronously to prevent blocking webhook response
+      setTimeout(() => {
+        initializeWorkers();
+      }, 0);
     }
     return (smsQueueInstance as unknown as Record<string | symbol, unknown>)[prop];
   }
