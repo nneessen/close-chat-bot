@@ -4,6 +4,20 @@ This file tracks successful builds and deployments as restoration points for dev
 
 ## Successful Builds
 
+### ✅ cd0ea6c - Fix chatbot repetitive responses and upgrade to Claude Sonnet 4
+- **Date**: 2025-01-28
+- **Status**: ✅ Build Successful
+- **Features**: 
+  - **Major LLM Upgrade**: claude-3-5-sonnet-20250106 → claude-sonnet-4-20250514 (latest model)
+  - Fixed repetitive "Let me check my calendar..." responses
+  - Fixed Calendly availability time generation loop with proper date iteration
+  - Added safety counter to prevent infinite loops in date generation
+  - Fixed hardcoded model fallback in LLM service
+  - Added debug logging for availability slot generation
+  - Created specialized agents: appointment-llm-specialist & objection-handler-specialist
+- **Bug Fixes**: Resolved chatbot getting stuck in repetitive response loops
+- **Performance**: Latest Claude model provides better conversation quality
+
 ### ✅ 0fc1731 - Fix Calendly appointment booking integration
 - **Date**: 2025-01-08
 - **Status**: ✅ Build Successful, ✅ Railway Health Check Passed
