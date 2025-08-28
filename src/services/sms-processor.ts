@@ -280,6 +280,28 @@ async function determineBotType(messageContent: string): Promise<BotType> {
   return BotType.OBJECTION_HANDLER;
 }
 
+async function generateSimpleGreetingResponse(lead: Lead, messages: any[]): Promise<string | null> {
+  // Simple, contextual greeting responses
+  const greetings = [
+    `Hey ${lead.firstName || 'there'}! How can I help you today?`,
+    `Hi ${lead.firstName || 'there'}! What can I do for you?`,
+    `Hey! Good to hear from you. What's on your mind?`,
+    `Hi! How's it going? What can I help with?`,
+  ];
+  
+  // If this is the first greeting in a while, be more welcoming
+  const lastBotMessage = messages.filter(msg => msg.role === 'ASSISTANT').pop();
+  const timeSinceLastMessage = lastBotMessage ? 
+    (Date.now() - new Date(lastBotMessage.createdAt).getTime()) / (1000 * 60 * 60) : 999;
+  
+  if (timeSinceLastMessage > 24) { // More than 24 hours
+    return `Hey ${lead.firstName || 'there'}! Good to hear from you again. How can I help?`;
+  }
+  
+  // Return a random friendly greeting
+  return greetings[Math.floor(Math.random() * greetings.length)];
+}
+
 async function generateBotResponse(
   conversationId: string,
   userMessage: string,
@@ -339,6 +361,32 @@ async function generateBotResponse(
     lastBotContent: lastBotMessage?.content.substring(0, 50),
     conversationTypes: [...new Set(messages.map(m => m.conversation.botType))]
   });
+
+  // Detect simple greetings that should get friendly responses regardless of conversation history
+  const isSimpleGreeting = /^(hey|hi|hello|yo|sup|what's up|whats up|hey!+|hi!+|hello!+)$/i.test(userMessage.trim());
+  
+  if (isSimpleGreeting && hasExistingConversation) {
+    console.log('👋 Simple greeting detected in existing conversation - providing contextual response');
+    
+    // Generate a simple, friendly response that acknowledges the greeting
+    // but doesn't restart the conversation or provide irrelevant information
+    const greetingResponse = await generateSimpleGreetingResponse(lead, messages);
+    
+    if (greetingResponse) {
+      console.log('✅ Generated simple greeting response:', greetingResponse.substring(0, 100));
+      
+      await storeMessage(conversationId, userMessage, MessageRole.USER, smsId);
+      await storeMessage(conversationId, greetingResponse, MessageRole.ASSISTANT);
+      
+      const success = await closeService.sendSMS(lead.phone, greetingResponse, lead.closeId);
+      if (success) {
+        console.log('📤 Simple greeting response sent successfully');
+      } else {
+        console.error('❌ Failed to send simple greeting response');
+      }
+      return;
+    }
+  }
 
   // Simple appointment detection
   const isAppointmentRequest = 
