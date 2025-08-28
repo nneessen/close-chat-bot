@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "SKIP_ENV_VALIDATION=true npx prisma migrate deploy && prisma generate && next build",
+    "build": "SKIP_ENV_VALIDATION=true npx prisma db push --force-reset --accept-data-loss && prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
