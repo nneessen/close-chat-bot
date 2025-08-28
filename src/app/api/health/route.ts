@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { closeService } from '@/services/close';
-import { redis } from '@/lib/queue';
+import { redis, initializeWorkers } from '@/lib/queue';
 import env from '@/lib/env';
 
 export const dynamic = 'force-dynamic'; // Prevent static generation
@@ -70,6 +70,14 @@ export async function GET() {
   } catch (error) {
     checks.closeio.status = 'error';
     checks.closeio.details = error instanceof Error ? error.message : 'Close.io API connection failed';
+  }
+
+  // Force worker initialization on health check
+  try {
+    console.log('🔧 Health check triggering worker initialization...');
+    initializeWorkers();
+  } catch (error) {
+    console.error('❌ Failed to initialize workers:', error);
   }
 
   // Environment variables check

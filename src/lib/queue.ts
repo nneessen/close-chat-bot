@@ -109,6 +109,7 @@ export const initializeWorkers = () => {
   if (process.env.SKIP_ENV_VALIDATION === 'true') return; // Skip during build
   if (workersInitialized) return; // Prevent duplicate initialization
   
+  console.log('🚀 INITIALIZING SMS WORKERS - This should show in logs!');
   workersInitialized = true;
   
   const smsWorker = new Worker(
@@ -142,7 +143,7 @@ export const initializeWorkers = () => {
   );
   
   smsWorker.on('ready', () => {
-    console.log('📱 SMS Worker is ready and listening for jobs');
+    console.log('📱 SMS Worker is ready and listening for jobs - WORKERS ARE RUNNING!');
   });
   
   smsWorker.on('active', (job) => {
