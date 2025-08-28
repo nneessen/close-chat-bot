@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { smsQueue } from '@/lib/queue';
+import { prisma } from '../../../../lib/prisma';
+import { smsQueue } from '../../../../lib/queue';
 
 export async function POST(req: NextRequest) {
   console.log('🧪 LIVE WEBHOOK TEST - Simulating real Close.io webhook');

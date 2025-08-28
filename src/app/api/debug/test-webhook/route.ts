@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { smsQueue } from '@/lib/queue';
+import { prisma } from '../../../../lib/prisma';
+import { smsQueue } from '../../../../lib/queue';
 
 export async function POST() {
   const results = {
