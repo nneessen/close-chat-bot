@@ -215,7 +215,7 @@ export class LeadNurturingService {
     // If unclear response
     return {
       stage: 'first_vs_replacement',
-      response: 'Just to clarify - do you currently have any life insurance or mortgage protection coverage, or would this be your first policy?'
+      response: 'Just to clarify - do you currently have any mortgage protection coverage, or would this be your first policy?'
     };
   }
 

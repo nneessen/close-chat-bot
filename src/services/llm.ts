@@ -60,12 +60,12 @@ class LLMService {
       objection: [
         "I completely understand your hesitation. Many homeowners feel the same way initially. Can I share why mortgage protection becomes so important once you understand the risks?",
         "That's a very common concern, and I appreciate you being honest about it. Let me explain how mortgage protection actually works and why it might be more affordable than you think.",
-        "I hear this a lot, and it's totally understandable. The good news is that mortgage protection is designed to be much more affordable than traditional life insurance. Can I show you some numbers?"
+        "I hear this a lot, and it's totally understandable. The good news is that mortgage protection is designed to be much more affordable than you think. Can I show you some numbers?"
       ],
       general: [
         "Thanks for your message! I'm here to help you understand your mortgage protection options. What specific questions do you have?",
         "Hi! I'm Nick, and I specialize in helping homeowners protect their families' financial future. How can I assist you today?",
-        "Great to connect with you! I'd be happy to answer any questions about mortgage protection or life insurance. What would you like to know?"
+        "Great to connect with you! I'd be happy to answer any questions about mortgage protection. What would you like to know?"
       ]
     };
 

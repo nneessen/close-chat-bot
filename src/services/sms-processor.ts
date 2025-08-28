@@ -332,32 +332,45 @@ async function generateBotResponse(
     }
   }
 
-  // Use advanced template engine for intelligent response selection
-  console.log('🎯 Using advanced template engine');
+  // TEMPLATE SYSTEM DISABLED - BROKEN - Use lead nurturing for conversation flow
+  console.log('🎯 Using lead nurturing service (template system disabled - broken)');
   
+  const nurturingContext = {
+    leadInfo: {
+      name: `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'there',
+      firstName: lead.firstName || '',
+      lastName: lead.lastName || '',
+      email: lead.email || undefined,
+      phone: lead.phone,
+      leadId: lead.id,
+      state: extractStateFromMetadata(lead.metadata as Record<string, unknown> | null),
+    },
+    userMessage,
+    conversationId,
+    previousMessages: messages.map(msg => ({
+      role: msg.role.toLowerCase() as 'user' | 'assistant',
+      content: msg.content,
+      timestamp: msg.createdAt.toISOString(),
+    })),
+  };
+
   try {
-    const templateResponse = await generateTemplateResponse(userMessage, lead, messages);
+    const nurturingResult = await leadNurturingService.processNurturingFlow(nurturingContext);
     
     // Check for duplicate response
-    if (lastBotMessage && lastBotMessage.content === templateResponse.content) {
-      console.log('⚠️ Duplicate template response detected, trying lead nurturing fallback');
-      
-      // Try lead nurturing as fallback
-      const nurturingResponse = await generateNurturingFallback(userMessage, lead, messages);
-      if (nurturingResponse && nurturingResponse.content !== lastBotMessage.content) {
-        return nurturingResponse;
-      }
-      
-      // Final fallback to AI
+    if (lastBotMessage && lastBotMessage.content === nurturingResult.response) {
+      console.log('⚠️ Duplicate nurturing response detected, using LLM fallback');
       return await generateFallbackResponse(userMessage, lead, messages);
     }
     
-    return templateResponse;
+    return {
+      content: nurturingResult.response,
+      tokens: nurturingResult.response.length / 4,
+      finishReason: 'stop',
+      model: 'lead-nurturing-system'
+    };
   } catch (error) {
-    console.error('❌ Template engine error:', error);
-    
-    // Fallback to lead nurturing
-    return await generateNurturingFallback(userMessage, lead, messages);
+    console.error('❌ Lead nurturing error:', error);
   }
 
   // Fallback to AI response

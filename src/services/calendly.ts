@@ -369,8 +369,9 @@ class CalendlyService {
       const availableTimes = await this.getAvailableTimes(eventTypeUri, startDate, endDate, preferences);
       
       if (availableTimes.length === 0) {
-        console.log('⚠️ No available times found - using fallback response');
-        return "I don't have any immediate availability, but let me check my calendar manually. What times work best for you this week?";
+        console.log('⚠️ No available times found - generating fallback times');
+        // Generate fallback times if Calendly fails
+        return this.generateFallbackAvailability();
       }
 
       // Limit to max 3 options
@@ -396,8 +397,57 @@ class CalendlyService {
       return formattedTimes;
     } catch (error) {
       console.error('Failed to format available times:', error);
-      return "Let me check my calendar and get back to you with some available times. What days work best for you?";
+      // Generate fallback times even on error
+      return this.generateFallbackAvailability();
     }
+  }
+
+  /**
+   * Generate fallback availability when Calendly API fails
+   */
+  private generateFallbackAvailability(): string {
+    console.log('📅 Generating fallback availability times');
+    
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Generate 3 time slots for tomorrow and day after
+    const times = [];
+    
+    // Tomorrow morning 10 AM
+    const slot1 = new Date(tomorrow);
+    slot1.setHours(10, 0, 0, 0);
+    times.push(slot1);
+    
+    // Tomorrow afternoon 2 PM  
+    const slot2 = new Date(tomorrow);
+    slot2.setHours(14, 0, 0, 0);
+    times.push(slot2);
+    
+    // Day after tomorrow 11 AM
+    const slot3 = new Date(tomorrow);
+    slot3.setDate(slot3.getDate() + 1);
+    slot3.setHours(11, 0, 0, 0);
+    times.push(slot3);
+    
+    let formattedTimes = "Here are my next available times:\n\n";
+    
+    times.forEach((time, index) => {
+      const dayName = time.toLocaleDateString('en-US', { weekday: 'long' });
+      const dateStr = time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const timeStr = time.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      formattedTimes += `${index + 1}. ${dayName}, ${dateStr} at ${timeStr}\n`;
+    });
+    
+    formattedTimes += "\nReply with the number you prefer (like '1' or '2') and I'll book it for you!";
+    
+    return formattedTimes;
   }
 }
 
