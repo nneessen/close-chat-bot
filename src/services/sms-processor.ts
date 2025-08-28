@@ -368,6 +368,9 @@ async function generateBotResponse(
   if (isSimpleGreeting && hasExistingConversation) {
     console.log('👋 Simple greeting detected in existing conversation - providing contextual response');
     
+    // Get or create conversation for this greeting
+    const conversation = await getOrCreateConversation(lead.id, botType);
+    
     // Generate a simple, friendly response that acknowledges the greeting
     // but doesn't restart the conversation or provide irrelevant information
     const greetingResponse = await generateSimpleGreetingResponse(lead, messages);
@@ -375,8 +378,24 @@ async function generateBotResponse(
     if (greetingResponse) {
       console.log('✅ Generated simple greeting response:', greetingResponse.substring(0, 100));
       
-      await storeMessage(conversationId, userMessage, MessageRole.USER, smsId);
-      await storeMessage(conversationId, greetingResponse, MessageRole.ASSISTANT);
+      // Store user message
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: MessageRole.USER,
+          content: userMessage,
+          closeActivityId: null, // This is not from Close.io webhook
+        },
+      });
+      
+      // Store bot response
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: MessageRole.ASSISTANT,
+          content: greetingResponse,
+        },
+      });
       
       const success = await closeService.sendSMS(lead.phone, greetingResponse, lead.closeId);
       if (success) {
