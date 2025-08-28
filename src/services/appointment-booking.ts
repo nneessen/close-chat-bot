@@ -184,23 +184,24 @@ export class AppointmentBookingService {
         };
       }
 
-      // Book the appointment
+      // Book the appointment (creates a booking link)
       const bookingResult = await this.bookAppointment(selectedTime, eventTypeUri, context.leadInfo);
       
       if (bookingResult.success) {
         return {
           action: 'book_appointment',
-          response: `✅ Perfect! Your appointment is confirmed for ${this.formatDateTime(selectedTime)}.\n\nYou'll receive a confirmation email at ${context.leadInfo.email} with all the details and calendar invitation.\n\nI look forward to speaking with you!`,
+          response: `✅ Perfect! I've reserved ${this.formatDateTime(selectedTime)} for you.\n\nTo complete your booking, please click this link: ${bookingResult.bookingUrl}\n\nThis will add the appointment to your calendar and you'll receive a confirmation email at ${context.leadInfo.email}.\n\nI look forward to speaking with you!`,
           appointmentDetails: {
             dateTime: selectedTime,
             duration: 30, // Default 30 minutes
-            appointmentId: bookingResult.appointmentDetails?.id
+            appointmentId: bookingResult.appointmentDetails?.id,
+            calendlyUri: bookingResult.bookingUrl
           }
         };
       } else {
         return {
           action: 'general_response',
-          response: `I had trouble booking that specific time. Let me check my calendar manually and confirm ${this.formatDateTime(selectedTime)} works for you.`
+          response: `I had trouble setting up that specific time. Let me check my calendar manually and confirm ${this.formatDateTime(selectedTime)} works for you.`
         };
       }
     } catch (error) {
@@ -216,11 +217,11 @@ export class AppointmentBookingService {
     dateTime: string, 
     eventTypeUri: string, 
     leadInfo: { name: string; email?: string; phone: string; leadId: string }
-  ): Promise<{ success: boolean; appointmentDetails?: { id: string; scheduledAt: string; eventUri: string }; error?: string }> {
+  ): Promise<{ success: boolean; bookingUrl?: string; appointmentDetails?: { id: string; scheduledAt: string; eventUri: string }; error?: string }> {
     try {
-      console.log('📅 Booking appointment:', { dateTime, leadInfo: leadInfo.name });
+      console.log('📅 Creating appointment booking:', { dateTime, leadInfo: leadInfo.name });
 
-      // Actually book the appointment directly in Calendly
+      // Create booking via Calendly service (returns a booking link)
       const bookingResult = await calendlyService.bookAppointment({
         eventTypeUri,
         dateTime,
@@ -231,26 +232,28 @@ export class AppointmentBookingService {
         }
       });
       
-      // Store appointment in database
+      // Store appointment in database as 'pending' until user clicks link
       const appointment = await prisma.appointment.create({
         data: {
           leadId: leadInfo.leadId,
-          calendlyEventId: bookingResult.eventUri || 'pending',
+          calendlyEventId: bookingResult.eventUri || 'pending-booking-link',
           scheduledAt: new Date(dateTime),
           duration: 30,
-          status: 'scheduled',
+          status: 'pending_confirmation', // Changed from 'scheduled'
           eventType: 'mortgage_consultation',
           metadata: {
             attendeeEmail: leadInfo.email!,
             attendeeName: leadInfo.name,
             attendeePhone: leadInfo.phone,
-            calendlyEventUri: bookingResult.eventUri
+            calendlyEventUri: bookingResult.eventUri,
+            bookingUrl: bookingResult.bookingUrl
           }
         }
       });
 
       return { 
-        success: true, 
+        success: true,
+        bookingUrl: bookingResult.bookingUrl,
         appointmentDetails: {
           id: appointment.id,
           scheduledAt: dateTime,
@@ -258,7 +261,7 @@ export class AppointmentBookingService {
         }
       };
     } catch (error) {
-      console.error('❌ Booking failed:', error);
+      console.error('❌ Booking creation failed:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
