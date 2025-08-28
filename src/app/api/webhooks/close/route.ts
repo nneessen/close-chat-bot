@@ -60,21 +60,45 @@ export async function POST(req: NextRequest) {
       text: payload.event?.data?.text?.substring(0, 100)
     });
     
-    // Store webhook event for processing
+    // Store webhook event for processing with duplicate handling
     console.log('💾 Attempting to store webhook event in database...');
     let webhookEvent;
     try {
-      webhookEvent = await prisma.webhookEvent.create({
-        data: {
+      // First check if we already processed this exact webhook
+      const existingEvent = await prisma.webhookEvent.findFirst({
+        where: {
           source: 'close',
           eventType: payload.event.object_type,
-          payload: JSON.parse(JSON.stringify(payload)),
-        },
+          payload: {
+            path: ['event', 'data', 'id'],
+            equals: payload.event.data.id
+          }
+        }
       });
-      console.log('✅ Webhook event stored successfully:', webhookEvent.id);
+
+      if (existingEvent) {
+        console.log('⚠️ Duplicate webhook detected, using existing event:', existingEvent.id);
+        webhookEvent = existingEvent;
+      } else {
+        webhookEvent = await prisma.webhookEvent.create({
+          data: {
+            source: 'close',
+            eventType: payload.event.object_type,
+            payload: JSON.parse(JSON.stringify(payload)),
+          },
+        });
+        console.log('✅ Webhook event stored successfully:', webhookEvent.id);
+      }
     } catch (dbError) {
       console.error('❌ Database error storing webhook event:', dbError);
-      throw dbError;
+      
+      // Simple fallback - just continue without storing the event if it's a duplicate
+      if (dbError.code === 'P2002') {
+        console.log('🔄 Duplicate constraint error, continuing with mock webhook event...');
+        webhookEvent = { id: 'duplicate-' + Date.now() };
+      } else {
+        throw dbError;
+      }
     }
 
     // Only process INBOUND SMS messages
