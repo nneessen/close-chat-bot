@@ -4,7 +4,19 @@ This file tracks successful builds and deployments as restoration points for dev
 
 ## Successful Builds
 
-### ✅ 59c1bca - MAJOR UPGRADE: Comprehensive Template System with 800+ Intelligent Responses
+### ⚠️ 59c1bca - BROKEN: Template System Issues - DO NOT USE
+- **Date**: 2025-01-28
+- **Status**: ❌ **BROKEN - TEMPLATE SYSTEM NOT WORKING**
+- **Critical Issues**:
+  - ❌ Responses don't match lead messages (context broken)
+  - ❌ Using "life insurance" language instead of "mortgage protection"
+  - ❌ NOT showing real Calendly available times
+  - ❌ Appointment booking may not work
+  - ❌ Conversation flow completely broken
+- **User Feedback**: "this chat bot is not perfect by any means, and we need to fix this"
+- **Restore Point**: Use cd0ea6c (previous working version) if fixes fail
+
+### ✅ cd0ea6c - LAST KNOWN WORKING VERSION
 - **Date**: 2025-01-28
 - **Status**: ✅ Build Successful
 - **MAJOR FEATURES**: 
