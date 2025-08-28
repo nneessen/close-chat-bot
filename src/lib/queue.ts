@@ -32,18 +32,83 @@ const createRedisConnection = () => {
   }
 };
 
-// Create separate connections for queue and worker (BullMQ requirement)
-const queueConnection = createRedisConnection();
-const workerConnection = createRedisConnection();
+// Lazy-loaded connections to avoid build-time Redis connections
+let queueConnection: Redis | null = null;
+let workerConnection: Redis | null = null;
+let smsQueueInstance: Queue | null = null;
+let calendlyQueueInstance: Queue | null = null;
 
-// SMS processing queue
-export const smsQueue = new Queue('sms-processing', { connection: queueConnection });
+const getQueueConnection = () => {
+  if (!queueConnection) {
+    // Skip Redis connection during build
+    if (process.env.SKIP_ENV_VALIDATION === 'true') {
+      throw new Error('Queue connections not available during build');
+    }
+    queueConnection = createRedisConnection();
+  }
+  return queueConnection;
+};
 
-// Calendly webhook queue
-export const calendlyQueue = new Queue('calendly-processing', { connection: queueConnection });
+const getWorkerConnection = () => {
+  if (!workerConnection) {
+    // Skip Redis connection during build
+    if (process.env.SKIP_ENV_VALIDATION === 'true') {
+      throw new Error('Worker connections not available during build');
+    }
+    workerConnection = createRedisConnection();
+  }
+  return workerConnection;
+};
 
-// SMS Worker
-if (process.env.NODE_ENV !== 'test') {
+// SMS processing queue (lazy-loaded)
+export const smsQueue = new Proxy({} as Queue, {
+  get(target, prop) {
+    // During build, return a no-op function for methods to prevent errors
+    if (process.env.SKIP_ENV_VALIDATION === 'true') {
+      if (typeof prop === 'string' && ['add', 'close'].includes(prop)) {
+        return () => Promise.resolve({ id: 'build-time-mock' });
+      }
+      return undefined;
+    }
+    
+    if (!smsQueueInstance) {
+      smsQueueInstance = new Queue('sms-processing', { connection: getQueueConnection() });
+      // Auto-initialize workers when first queue operation happens
+      initializeWorkers();
+    }
+    return (smsQueueInstance as unknown as Record<string | symbol, unknown>)[prop];
+  }
+});
+
+// Calendly webhook queue (lazy-loaded)
+export const calendlyQueue = new Proxy({} as Queue, {
+  get(target, prop) {
+    // During build, return a no-op function for methods to prevent errors
+    if (process.env.SKIP_ENV_VALIDATION === 'true') {
+      if (typeof prop === 'string' && ['add', 'close'].includes(prop)) {
+        return () => Promise.resolve({ id: 'build-time-mock' });
+      }
+      return undefined;
+    }
+    
+    if (!calendlyQueueInstance) {
+      calendlyQueueInstance = new Queue('calendly-processing', { connection: getQueueConnection() });
+    }
+    return (calendlyQueueInstance as unknown as Record<string | symbol, unknown>)[prop];
+  }
+});
+
+// Track worker initialization to prevent duplicates
+let workersInitialized = false;
+
+// Initialize workers lazily only when needed at runtime
+export const initializeWorkers = () => {
+  if (process.env.NODE_ENV === 'test') return;
+  if (process.env.SKIP_ENV_VALIDATION === 'true') return; // Skip during build
+  if (workersInitialized) return; // Prevent duplicate initialization
+  
+  workersInitialized = true;
+  
   const smsWorker = new Worker(
     'sms-processing',
     async (job) => {
@@ -67,7 +132,7 @@ if (process.env.NODE_ENV !== 'test') {
       }
     },
     {
-      connection: workerConnection,
+      connection: getWorkerConnection(),
       concurrency: 5,
       removeOnComplete: { count: 100 },
       removeOnFail: { count: 50 },
@@ -102,13 +167,13 @@ if (process.env.NODE_ENV !== 'test') {
       await processCalendlyWebhook(webhookEventId, payload);
     },
     {
-      connection: workerConnection,
+      connection: getWorkerConnection(),
       concurrency: 3,
       removeOnComplete: { count: 100 },
       removeOnFail: { count: 50 },
     }
   );
-}
+};
 
-export { queueConnection as connection };
-export { queueConnection as redis };
+export { getQueueConnection as connection };
+export { getQueueConnection as redis };

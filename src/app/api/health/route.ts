@@ -24,7 +24,8 @@ export async function GET() {
 
   // Redis check
   try {
-    await redis.ping();
+    const redisConnection = redis();
+    await redisConnection.ping();
     checks.redis.status = 'ok';
     checks.redis.details = 'Connected to Redis successfully';
   } catch (error) {
