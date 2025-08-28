@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { getSmsQueue } from '@/lib/queue-lazy';
+import { getSmsQueue } from '@/lib/queue-build-safe';
 import { CloseWebhookPayload } from '@/types';
 
 export async function POST(req: NextRequest) {

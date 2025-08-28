@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSmsQueue } from '@/lib/queue-lazy';
+import { getSmsQueue } from '@/lib/queue-build-safe';
 
 export async function GET() {
   try {

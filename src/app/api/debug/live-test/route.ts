@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
-import { smsQueue } from '../../../../lib/queue';
+import { getSmsQueue } from '@/lib/queue-build-safe';
 
 export async function POST(req: NextRequest) {
   console.log('🧪 LIVE WEBHOOK TEST - Simulating real Close.io webhook');
@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
 
     // Add to queue
     console.log('🔄 Adding to SMS queue...');
+    const smsQueue = getSmsQueue();
+    if (!smsQueue) {
+      throw new Error('SMS Queue not initialized');
+    }
     const job = await smsQueue.add('process-sms', {
       webhookEventId: webhookEvent.id,
       payload: testPayload,

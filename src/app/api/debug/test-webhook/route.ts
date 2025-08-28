@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
-import { smsQueue } from '../../../../lib/queue';
+import { getSmsQueue } from '@/lib/queue-build-safe';
 
 export async function POST() {
   const results = {
@@ -41,6 +41,10 @@ export async function POST() {
   try {
     console.log('🔍 Testing queue system...');
     
+    const smsQueue = getSmsQueue();
+    if (!smsQueue) {
+      throw new Error('SMS Queue not initialized');
+    }
     const job = await smsQueue.add('test-job', {
       test: true,
       timestamp: new Date().toISOString()
@@ -85,7 +89,11 @@ export async function POST() {
       }
     });
 
-    const job = await smsQueue.add('process-sms', {
+    const testQueue = getSmsQueue();
+    if (!testQueue) {
+      throw new Error('SMS Queue not initialized');
+    }
+    const job = await testQueue.add('process-sms', {
       webhookEventId: webhookEvent.id,
       payload: mockPayload,
     });

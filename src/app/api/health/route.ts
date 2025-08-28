@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/queue-lazy';
+import { redis } from '@/lib/queue-build-safe';
 import { closeService } from '@/services/close';
 import env from '@/lib/env';
 
