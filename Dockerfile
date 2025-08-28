@@ -16,7 +16,7 @@ COPY . .
 # Generate Prisma client and build
 ENV SKIP_ENV_VALIDATION=true
 RUN npx prisma generate
-RUN npm run build:next
+RUN SKIP_ENV_VALIDATION=true npm run build:next
 
 # Expose port
 EXPOSE 3000
