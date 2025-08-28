@@ -89,13 +89,13 @@ export async function POST(req: NextRequest) {
         });
         console.log('✅ Webhook event stored successfully:', webhookEvent.id);
       }
-    } catch (dbError: any) {
+    } catch (dbError) {
       console.error('❌ Database error storing webhook event:', dbError);
       
       // Simple fallback - just continue without storing the event if it's a duplicate
-      if (dbError?.code === 'P2002') {
+      if (dbError && typeof dbError === 'object' && 'code' in dbError && dbError.code === 'P2002') {
         console.log('🔄 Duplicate constraint error, continuing with mock webhook event...');
-        webhookEvent = { id: 'duplicate-' + Date.now() } as any;
+        webhookEvent = { id: 'duplicate-' + Date.now(), processed: false, processedAt: null, error: null } as typeof webhookEvent;
       } else {
         throw dbError;
       }
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
         payload.event.data.direction === 'inbound') {
       
       console.log('📥 Adding INBOUND SMS to queue:', {
-        eventId: webhookEvent.id,
+        eventId: webhookEvent?.id || 'unknown',
         direction: payload.event.data.direction,
         text: payload.event.data.text?.substring(0, 50)
       });
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       console.log('🔄 Adding SMS job to queue...');
       try {
         const job = await smsQueue.add('process-sms', {
-          webhookEventId: webhookEvent.id,
+          webhookEventId: webhookEvent?.id || 'temp-' + Date.now(),
           payload,
         });
         
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, eventId: webhookEvent.id });
+    return NextResponse.json({ success: true, eventId: webhookEvent?.id || 'processed' });
   } catch (error) {
     console.error('Webhook processing error:', error);
     return NextResponse.json(

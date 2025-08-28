@@ -40,16 +40,16 @@ async function setupWebhook() {
       return;
     }
 
-    // Create new webhook - Close.io uses "activity" for SMS events
+    // Create new webhook - Close.io uses lowercase "activity.sms" for SMS events
     const createResponse = await axios.post('https://api.close.com/api/v1/webhook/', {
       url: `${WEBHOOK_URL}/close`,
       events: [
         {
-          object_type: 'activity.SMS',
+          object_type: 'activity.sms',  // lowercase 'sms'
           action: 'created'
         },
         {
-          object_type: 'activity.SMS',
+          object_type: 'activity.sms',  // lowercase 'sms'
           action: 'updated'
         },
         {
