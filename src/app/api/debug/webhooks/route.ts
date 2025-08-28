@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { closeService } from '@/services/close';
+import { closeService } from '../../../../services/close';
 
 export async function GET() {
   try {
@@ -21,7 +21,7 @@ export async function GET() {
       })),
       expectedUrl,
       hasCorrectWebhook: webhooks.some(w => w.url === expectedUrl && w.is_active),
-      recommendations: []
+      recommendations: [] as string[]
     };
 
     // Add recommendations
