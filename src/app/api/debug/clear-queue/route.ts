@@ -50,10 +50,25 @@ export async function POST() {
           
           // Create a fake webhook payload matching Close.io format
           const fakeWebhookPayload = {
+            subscription_id: 'fake-subscription-poll',
             event: {
+              id: `fake-event-${sms.id}`,
               object_type: 'activity.sms',
               action: 'created',
-              data: sms
+              date_created: sms.date_created || new Date().toISOString(),
+              date_updated: sms.date_updated || new Date().toISOString(),
+              organization_id: sms.organization_id || process.env.CLOSE_ORGANIZATION_ID || '',
+              user_id: sms.user_id || null,
+              request_id: null,
+              api_key_id: null,
+              oauth_client_id: null,
+              oauth_scope: null,
+              object_id: sms.id,
+              lead_id: sms.lead_id || '',
+              changed_fields: [],
+              meta: {},
+              data: sms,
+              previous_data: {}
             }
           };
 
