@@ -280,7 +280,7 @@ async function determineBotType(messageContent: string): Promise<BotType> {
   return BotType.OBJECTION_HANDLER;
 }
 
-async function generateSimpleGreetingResponse(lead: Lead, messages: any[]): Promise<string | null> {
+async function generateSimpleGreetingResponse(lead: Lead, messages: Array<{ role: string; createdAt: Date }>): Promise<string | null> {
   // Simple, contextual greeting responses
   const greetings = [
     `Hey ${lead.firstName || 'there'}! How can I help you today?`,
