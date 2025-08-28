@@ -9,6 +9,8 @@
  *   node manage-close-webhooks.js delete <webhook-id>     - Delete webhook
  *   node manage-close-webhooks.js delete-all              - Delete all webhooks
  *   node manage-close-webhooks.js setup-production        - Setup for Railway
+ *   node manage-close-webhooks.js setup-local             - Setup for local development
+ *   node manage-close-webhooks.js setup                   - Interactive setup with options
  */
 
 const axios = require('axios');
@@ -168,27 +170,13 @@ async function deleteAllWebhooks() {
 }
 
 async function setupProduction() {
-  const productionUrl = process.env.WEBHOOK_ENDPOINT_URL || process.env.NEXT_PUBLIC_APP_URL;
+  // Force Railway production URL
+  const railwayUrl = 'https://close-chat-bot-production.up.railway.app/api/webhooks/close';
   
-  if (!productionUrl) {
-    console.error('❌ Missing WEBHOOK_ENDPOINT_URL or NEXT_PUBLIC_APP_URL');
-    console.error('Set your Railway production URL in .env:');
-    console.error('WEBHOOK_ENDPOINT_URL=https://your-app.up.railway.app/api/webhooks');
-    process.exit(1);
-  }
+  console.log('🚀 Setting up PRODUCTION webhook for Railway...');
+  console.log(`URL: ${railwayUrl}\n`);
   
-  // Ensure URL ends with /api/webhooks/close
-  let webhookUrl = productionUrl;
-  if (!webhookUrl.includes('/api/webhooks')) {
-    webhookUrl = webhookUrl.replace(/\/$/, '') + '/api/webhooks/close';
-  } else if (!webhookUrl.endsWith('/close')) {
-    webhookUrl = webhookUrl.replace(/\/$/, '') + '/close';
-  }
-  
-  console.log('🚀 Setting up production webhook...');
-  console.log(`URL: ${webhookUrl}\n`);
-  
-  const webhook = await createWebhook(webhookUrl);
+  const webhook = await createWebhook(railwayUrl);
   
   const secret = webhook.verify_key || webhook.signature_key || webhook.secret;
   if (secret) {
@@ -199,6 +187,71 @@ async function setupProduction() {
     console.log('3. Test by sending an SMS to your Close.io phone number');
   } else {
     console.log('\n⚠️  WARNING: Could not find webhook secret. Check the webhook details above.');
+  }
+}
+
+async function setupLocal() {
+  // Use localhost for local development
+  const localUrl = 'http://localhost:3001/api/webhooks/close';
+  
+  console.log('💻 Setting up LOCAL webhook for development...');
+  console.log(`URL: ${localUrl}\n`);
+  console.log('⚠️  NOTE: This requires ngrok or similar tunnel for Close.io to reach localhost');
+  
+  const webhook = await createWebhook(localUrl);
+  
+  const secret = webhook.verify_key || webhook.signature_key || webhook.secret;
+  if (secret) {
+    console.log('\n📝 Next Steps:');
+    console.log('1. Add the webhook secret to your .env file:');
+    console.log(`   CLOSE_WEBHOOK_SECRET=${secret}`);
+    console.log('2. Start ngrok: ngrok http 3001');
+    console.log('3. Update webhook URL to ngrok URL manually');
+  }
+}
+
+async function interactiveSetup() {
+  const readline = require('readline');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  console.log('🛠️  Interactive Webhook Setup\n');
+  console.log('Choose your setup option:');
+  console.log('1. Production (Railway) - https://close-chat-bot-production.up.railway.app');
+  console.log('2. Local Development - http://localhost:3001');
+  console.log('3. Custom URL');
+  
+  const answer = await new Promise((resolve) => {
+    rl.question('\nSelect option (1-3): ', resolve);
+  });
+  
+  rl.close();
+  
+  switch (answer.trim()) {
+    case '1':
+      await setupProduction();
+      break;
+    case '2':
+      await setupLocal();
+      break;
+    case '3':
+      const customUrl = await new Promise((resolve) => {
+        const rl2 = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+        rl2.question('Enter custom webhook URL: ', (url) => {
+          rl2.close();
+          resolve(url);
+        });
+      });
+      await createWebhook(customUrl);
+      break;
+    default:
+      console.log('❌ Invalid option selected');
+      process.exit(1);
   }
 }
 
@@ -235,8 +288,15 @@ async function main() {
       break;
       
     case 'setup-production':
-    case 'setup':
       await setupProduction();
+      break;
+      
+    case 'setup-local':
+      await setupLocal();
+      break;
+      
+    case 'setup':
+      await interactiveSetup();
       break;
       
     default:
@@ -247,6 +307,8 @@ async function main() {
       console.log('  delete <webhook-id>  - Delete specific webhook');
       console.log('  delete-all           - Delete all webhooks');
       console.log('  setup-production     - Setup for Railway deployment');
+      console.log('  setup-local          - Setup for local development');
+      console.log('  setup                - Interactive setup with options');
       console.log('\nExamples:');
       console.log('  node manage-close-webhooks.js list');
       console.log('  node manage-close-webhooks.js create https://app.railway.app/api/webhooks/close');

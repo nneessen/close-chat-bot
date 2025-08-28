@@ -221,6 +221,13 @@ Handles all other conversations with focus on:
 
 ## Key Considerations
 
+### Close.io Webhook Management (CRITICAL INFO)
+- **IMPORTANT**: Close.io does NOT allow manual webhook configuration via dashboard
+- **ALL webhook management MUST be done via API using scripts**
+- Use `node scripts/manage-close-webhooks.js` for webhook management
+- Use `setup-production` command to configure for Railway deployment
+- Webhook URLs must be HTTPS and publicly accessible (not localhost)
+
 ### Security
 - Webhook signature verification for all incoming requests
 - Rate limiting on API endpoints
