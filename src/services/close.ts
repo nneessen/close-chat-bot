@@ -39,10 +39,13 @@ class CloseService {
   private client: AxiosInstance;
 
   constructor() {
+    // Use env.CLOSE_API_KEY if available, fallback to process.env for build-safe scenarios
+    const closeApiKey = env.CLOSE_API_KEY || process.env.CLOSE_API_KEY;
+    
     this.client = axios.create({
       baseURL: 'https://api.close.com/api/v1',
       auth: {
-        username: env.CLOSE_API_KEY!,
+        username: closeApiKey!,
         password: '',
       },
       headers: {
@@ -53,7 +56,7 @@ class CloseService {
     // Add request/response interceptors for logging and error handling
     this.client.interceptors.request.use(
       (config) => {
-        if (env.ENABLE_DEBUG_MODE) {
+        if (env.ENABLE_DEBUG_MODE || process.env.ENABLE_DEBUG_MODE === 'true') {
           console.log('Close API Request:', {
             method: config.method,
             url: config.url,
@@ -70,7 +73,7 @@ class CloseService {
 
     this.client.interceptors.response.use(
       (response) => {
-        if (env.ENABLE_DEBUG_MODE) {
+        if (env.ENABLE_DEBUG_MODE || process.env.ENABLE_DEBUG_MODE === 'true') {
           console.log('Close API Response:', {
             status: response.status,
             data: response.data,

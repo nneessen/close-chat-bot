@@ -14,7 +14,6 @@ RUN npm ci --no-cache
 COPY . .
 
 # Generate Prisma client and build
-ENV SKIP_ENV_VALIDATION=true
 RUN npx prisma generate
 RUN SKIP_ENV_VALIDATION=true npm run build:next
 
