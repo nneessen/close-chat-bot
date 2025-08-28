@@ -5,6 +5,7 @@ import { closeService } from './close';
 import { appointmentBookingService } from './appointment-booking';
 import { conversationLearningService } from './conversation-learning';
 import { leadNurturingService } from './lead-nurturing';
+import { templateEngine } from './template-engine';
 import { BotType, MessageRole, ConversationStatus, Lead } from '@prisma/client';
 
 export async function processSMSWebhook(
@@ -331,8 +332,152 @@ async function generateBotResponse(
     }
   }
 
-  // Use lead nurturing for conversation flow
-  console.log('🎯 Using lead nurturing service');
+  // Use advanced template engine for intelligent response selection
+  console.log('🎯 Using advanced template engine');
+  
+  try {
+    const templateResponse = await generateTemplateResponse(userMessage, lead, messages);
+    
+    // Check for duplicate response
+    if (lastBotMessage && lastBotMessage.content === templateResponse.content) {
+      console.log('⚠️ Duplicate template response detected, trying lead nurturing fallback');
+      
+      // Try lead nurturing as fallback
+      const nurturingResponse = await generateNurturingFallback(userMessage, lead, messages);
+      if (nurturingResponse && nurturingResponse.content !== lastBotMessage.content) {
+        return nurturingResponse;
+      }
+      
+      // Final fallback to AI
+      return await generateFallbackResponse(userMessage, lead, messages);
+    }
+    
+    return templateResponse;
+  } catch (error) {
+    console.error('❌ Template engine error:', error);
+    
+    // Fallback to lead nurturing
+    return await generateNurturingFallback(userMessage, lead, messages);
+  }
+
+  // Fallback to AI response
+  return await generateFallbackResponse(userMessage, lead, messages);
+}
+
+async function generateTemplateResponse(
+  userMessage: string,
+  lead: Lead,
+  messages: Array<{ role: MessageRole; content: string; createdAt: Date }>
+) {
+  console.log('📝 Using template engine for response generation');
+  
+  // Determine conversation category and subcategory
+  const { category, subcategory, conversationStage } = analyzeMessageForTemplate(userMessage, messages);
+  
+  // Build template context
+  const context = {
+    firstName: lead.firstName || 'there',
+    lastName: lead.lastName || '',
+    email: lead.email || undefined,
+    phone: lead.phone,
+    state: extractStateFromMetadata(lead.metadata as Record<string, unknown> | null),
+    
+    conversationStage,
+    previousMessage: messages.length > 0 ? messages[messages.length - 1]?.content : undefined,
+    messageCount: messages.length,
+    leadAge: calculateLeadAge(lead.createdAt).type,
+    daysOld: calculateLeadAge(lead.createdAt).daysOld,
+    
+    timeOfDay: getTimeOfDay(),
+    dayOfWeek: getDayOfWeek(),
+    responseHistory: messages
+      .filter(msg => msg.role === MessageRole.ASSISTANT)
+      .slice(-5)
+      .map(msg => msg.content)
+  };
+  
+  try {
+    const response = await templateEngine.getBestResponse(category, subcategory, context);
+    
+    return {
+      content: response,
+      tokens: response.length / 4,
+      finishReason: 'stop',
+      model: 'advanced-template-engine'
+    };
+  } catch (error) {
+    console.error('❌ Template engine failed:', error);
+    throw error;
+  }
+}
+
+function analyzeMessageForTemplate(userMessage: string, messages: Array<{ role: MessageRole; content: string; createdAt: Date }>) {
+  const lowerMessage = userMessage.toLowerCase();
+  const messageCount = messages.length;
+  
+  // Detect objections first
+  if (lowerMessage.includes('expensive') || lowerMessage.includes('cost') || lowerMessage.includes('afford')) {
+    return { category: 'objection', subcategory: 'price', conversationStage: 'objection_handling' };
+  }
+  
+  if (lowerMessage.includes('busy') || lowerMessage.includes('time') || lowerMessage.includes('schedule')) {
+    return { category: 'objection', subcategory: 'time', conversationStage: 'objection_handling' };
+  }
+  
+  if (lowerMessage.includes('not interested') || lowerMessage.includes('no thanks')) {
+    return { category: 'objection', subcategory: 'need', conversationStage: 'objection_handling' };
+  }
+  
+  if (lowerMessage.includes('scam') || lowerMessage.includes('trust') || lowerMessage.includes('legitimate')) {
+    return { category: 'objection', subcategory: 'trust', conversationStage: 'objection_handling' };
+  }
+  
+  // Detect conversation stage
+  if (messageCount <= 2) {
+    return { category: 'opening', subcategory: 'introduction', conversationStage: 'opening' };
+  }
+  
+  if (lowerMessage.includes('yes') || lowerMessage.includes('sure') || lowerMessage.includes('ok')) {
+    if (messageCount <= 4) {
+      return { category: 'permission', subcategory: 'initial_permission', conversationStage: 'permission' };
+    } else {
+      return { category: 'qualification', subcategory: 'coverage_status', conversationStage: 'qualification' };
+    }
+  }
+  
+  // Default to general response
+  return { category: 'general', subcategory: 'default', conversationStage: 'general' };
+}
+
+function calculateLeadAge(createdAt: Date): { type: 'fresh' | 'aged'; daysOld: number } {
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - createdAt.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return {
+    type: diffDays <= 14 ? 'fresh' : 'aged',
+    daysOld: diffDays
+  };
+}
+
+function getTimeOfDay(): 'morning' | 'afternoon' | 'evening' {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
+
+function getDayOfWeek(): 'weekday' | 'weekend' {
+  const day = new Date().getDay();
+  return (day === 0 || day === 6) ? 'weekend' : 'weekday';
+}
+
+async function generateNurturingFallback(
+  userMessage: string,
+  lead: Lead,
+  messages: Array<{ role: MessageRole; content: string; createdAt: Date }>
+) {
+  console.log('🎯 Using lead nurturing fallback');
   
   const nurturingContext = {
     leadInfo: {
@@ -345,7 +490,7 @@ async function generateBotResponse(
       state: extractStateFromMetadata(lead.metadata as Record<string, unknown> | null),
     },
     userMessage,
-    conversationId,
+    conversationId: 'fallback',
     previousMessages: messages.map(msg => ({
       role: msg.role.toLowerCase() as 'user' | 'assistant',
       content: msg.content,
@@ -356,24 +501,16 @@ async function generateBotResponse(
   try {
     const nurturingResult = await leadNurturingService.processNurturingFlow(nurturingContext);
     
-    // Check for duplicate response
-    if (lastBotMessage && lastBotMessage.content === nurturingResult.response) {
-      console.log('⚠️ Duplicate nurturing response detected, using LLM fallback');
-      return await generateFallbackResponse(userMessage, lead, messages);
-    }
-    
     return {
       content: nurturingResult.response,
       tokens: nurturingResult.response.length / 4,
       finishReason: 'stop',
-      model: 'lead-nurturing-system'
+      model: 'lead-nurturing-fallback'
     };
   } catch (error) {
-    console.error('❌ Lead nurturing error:', error);
+    console.error('❌ Lead nurturing fallback error:', error);
+    return null;
   }
-
-  // Fallback to AI response
-  return await generateFallbackResponse(userMessage, lead, messages);
 }
 
 async function generateFallbackResponse(
@@ -402,37 +539,6 @@ async function generateFallbackResponse(
   return await llmService.generateResponse(userMessage, context);
 }
 
-function calculateLeadAge(dateCreated: string): { type: 'fresh' | 'aged'; daysOld: number } {
-  const createdDate = new Date(dateCreated);
-  const now = new Date();
-  const diffTime = Math.abs(now.getTime() - createdDate.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return {
-    type: diffDays <= 14 ? 'fresh' : 'aged',
-    daysOld: diffDays
-  };
-}
-
-function determineConversationStageFromHistory(messages: Array<{ content: string }>): string {
-  if (messages.length === 0) return 'opening';
-  if (messages.length <= 2) return 'opening';
-  
-  const recentMessages = messages.slice(-3);
-  const combinedText = recentMessages.map(m => m.content).join(' ').toLowerCase();
-  
-  if (combinedText.includes('schedule') || combinedText.includes('appointment') || combinedText.includes('available')) {
-    return 'appointment_setting';
-  }
-  
-  if (combinedText.includes('qualify') || combinedText.includes('coverage') || combinedText.includes('spouse')) {
-    return 'qualification';
-  }
-  
-  if (messages.length > 6) return 'closing';
-  
-  return 'objection';
-}
 
 function extractStateFromMetadata(metadata: Record<string, unknown> | null): string | undefined {
   if (!metadata) return undefined;
@@ -455,15 +561,3 @@ function extractStateFromMetadata(metadata: Record<string, unknown> | null): str
   return undefined;
 }
 
-function mapBotTypeToContext(botType: BotType): 'appointment' | 'objection' | 'general' {
-  switch (botType) {
-    case BotType.APPOINTMENT:
-      return 'appointment';
-    case BotType.OBJECTION_HANDLER:
-      return 'objection';
-    case BotType.GENERAL:
-      return 'general';
-    default:
-      return 'general';
-  }
-}
