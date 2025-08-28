@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "SKIP_ENV_VALIDATION=true prisma generate && next build",
+    "build": "npm run build:next",
+    "build:next": "next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
