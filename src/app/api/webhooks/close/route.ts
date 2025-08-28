@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
     'user-agent': req.headers.get('user-agent'),
     'x-forwarded-for': req.headers.get('x-forwarded-for'),
   });
+  
+  console.log('🚨 REAL WEBHOOK DEBUG - This should show for ALL requests including real SMS!');
   console.log('📊 Environment Info:', {
     NODE_ENV: process.env.NODE_ENV,
     WEBHOOK_ENDPOINT_URL: process.env.WEBHOOK_ENDPOINT_URL,
@@ -149,7 +151,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, eventId: webhookEvent?.id || 'processed' });
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    console.error('🚨 WEBHOOK PROCESSING ERROR - This is critical!:', error);
+    console.error('🚨 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('🚨 Request details when error occurred:', {
+      url: req.url,
+      method: req.method,
+      headers: Object.fromEntries(req.headers.entries())
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
