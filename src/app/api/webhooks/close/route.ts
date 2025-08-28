@@ -16,8 +16,6 @@ export async function POST(req: NextRequest) {
     'user-agent': req.headers.get('user-agent'),
     'x-forwarded-for': req.headers.get('x-forwarded-for'),
   });
-  
-  console.log('🚨 REAL WEBHOOK DEBUG - This should show for ALL requests including real SMS!');
   console.log('📊 Environment Info:', {
     NODE_ENV: process.env.NODE_ENV,
     WEBHOOK_ENDPOINT_URL: process.env.WEBHOOK_ENDPOINT_URL,
@@ -31,24 +29,20 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get('close-sig-hash');
     const timestamp = req.headers.get('close-sig-timestamp');
     
-    // Check for signature headers (but don't fail if missing for now)
-    if (!signature || !timestamp) {
-      console.log('⚠️ Missing signature headers - Close.io webhooks should have these');
-    }
+    // TEMPORARILY DISABLED FOR TESTING
+    // if (!signature || !timestamp) {
+    //   return NextResponse.json({ error: 'Missing signature headers' }, { status: 401 });
+    // }
 
     const body = await req.text();
     console.log('📄 Raw body length:', body.length);
-    console.log('📄 FULL RAW BODY FOR DEBUGGING:', body);
     console.log('📄 Raw body preview:', body.substring(0, 200) + '...');
     
-    // Verify webhook signature (log but don't reject for debugging)
-    if (signature && timestamp) {
-      const isValid = verifyWebhookSignature(body, signature, timestamp);
-      console.log(`🔐 Webhook signature verification: ${isValid ? 'VALID' : 'INVALID'}`);
-      if (!isValid) {
-        console.log('❌ Invalid signature - but continuing anyway for debugging');
-      }
-    }
+    // Verify webhook signature
+    // TEMPORARILY DISABLED FOR TESTING
+    // if (!verifyWebhookSignature(body, signature, timestamp)) {
+    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    // }
 
     let payload: CloseWebhookPayload;
     try {
@@ -66,15 +60,7 @@ export async function POST(req: NextRequest) {
       text: payload.event?.data?.text?.substring(0, 100)
     });
     
-    // EARLY RETURN: Only process INBOUND SMS messages to avoid unnecessary work
-    if (payload.event.object_type === 'activity.sms' && 
-        payload.event.action === 'created' &&
-        payload.event.data.direction === 'outbound') {
-      console.log('🚫 Ignoring outbound SMS - returning immediately');
-      return NextResponse.json({ success: true, message: 'Outbound SMS ignored' });
-    }
-
-    // Store webhook event for processing with duplicate handling (INBOUND only)
+    // Store webhook event for processing with duplicate handling
     console.log('💾 Attempting to store webhook event in database...');
     let webhookEvent;
     try {
@@ -115,9 +101,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Process INBOUND SMS messages (outbound already filtered out above)
+    // Only process INBOUND SMS messages
     if (payload.event.object_type === 'activity.sms' && 
-        payload.event.action === 'created') {
+        payload.event.action === 'created' &&
+        payload.event.data.direction === 'inbound') {
       
       console.log('📥 Adding INBOUND SMS to queue:', {
         eventId: webhookEvent?.id || 'unknown',
@@ -148,17 +135,16 @@ export async function POST(req: NextRequest) {
         console.error('❌ Queue error adding SMS job:', queueError);
         throw queueError;
       }
+    } else if (payload.event.object_type === 'activity.sms') {
+      console.log('🚫 Ignoring outbound SMS:', {
+        direction: payload.event.data.direction,
+        text: payload.event.data.text?.substring(0, 30)
+      });
     }
 
     return NextResponse.json({ success: true, eventId: webhookEvent?.id || 'processed' });
   } catch (error) {
-    console.error('🚨 WEBHOOK PROCESSING ERROR - This is critical!:', error);
-    console.error('🚨 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    console.error('🚨 Request details when error occurred:', {
-      url: req.url,
-      method: req.method,
-      headers: Object.fromEntries(req.headers.entries())
-    });
+    console.error('Webhook processing error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
