@@ -9,14 +9,27 @@ const createRedisConnection = () => {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
   console.log('🔗 Connecting to Redis:', redisUrl.replace(/:[^:@]*@/, ':***@')); // Log URL without password
   
-  return new Redis(redisUrl, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    retryStrategy: (times) => {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-    }
-  });
+  try {
+    return new Redis(redisUrl, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        console.log(`⏳ Redis retry attempt ${times}, waiting ${delay}ms`);
+        return delay;
+      },
+      reconnectOnError: (err) => {
+        const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT'];
+        if (targetErrors.some(e => err.message.includes(e))) {
+          return true;
+        }
+        return false;
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to create Redis connection:', error);
+    throw error;
+  }
 };
 
 // Create separate connections for queue and worker (BullMQ requirement)

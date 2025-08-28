@@ -62,7 +62,9 @@ function validateEnv(): Env {
   }
 }
 
-// Always use partial parsing to avoid build-time validation errors
-export const env = envSchema.partial().parse(process.env) as Env;
+// Skip validation during build time but validate at runtime
+export const env = process.env.SKIP_ENV_VALIDATION === 'true' 
+  ? {} as Env 
+  : validateEnv();
 
 export default env;
