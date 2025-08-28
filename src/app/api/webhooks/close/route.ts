@@ -29,20 +29,23 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get('close-sig-hash');
     const timestamp = req.headers.get('close-sig-timestamp');
     
-    // TEMPORARILY DISABLED FOR TESTING
-    // if (!signature || !timestamp) {
-    //   return NextResponse.json({ error: 'Missing signature headers' }, { status: 401 });
-    // }
+    // Check for signature headers (but don't fail if missing for now)
+    if (!signature || !timestamp) {
+      console.log('⚠️ Missing signature headers - Close.io webhooks should have these');
+    }
 
     const body = await req.text();
     console.log('📄 Raw body length:', body.length);
     console.log('📄 Raw body preview:', body.substring(0, 200) + '...');
     
-    // Verify webhook signature
-    // TEMPORARILY DISABLED FOR TESTING
-    // if (!verifyWebhookSignature(body, signature, timestamp)) {
-    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-    // }
+    // Verify webhook signature (log but don't reject for debugging)
+    if (signature && timestamp) {
+      const isValid = verifyWebhookSignature(body, signature, timestamp);
+      console.log(`🔐 Webhook signature verification: ${isValid ? 'VALID' : 'INVALID'}`);
+      if (!isValid) {
+        console.log('❌ Invalid signature - but continuing anyway for debugging');
+      }
+    }
 
     let payload: CloseWebhookPayload;
     try {
