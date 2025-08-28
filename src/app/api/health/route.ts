@@ -4,7 +4,17 @@ import { closeService } from '@/services/close';
 import { redis } from '@/lib/queue';
 import env from '@/lib/env';
 
+export const dynamic = 'force-dynamic'; // Prevent static generation
+
 export async function GET() {
+  // Skip health check during build
+  if (process.env.SKIP_ENV_VALIDATION === 'true') {
+    return NextResponse.json({
+      status: 'building',
+      message: 'Health check skipped during build'
+    });
+  }
+
   const checks = {
     database: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
     redis: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
