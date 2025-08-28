@@ -17,7 +17,7 @@ export async function GET() {
         events: webhook.events,
         isActive: webhook.is_active,
         isCorrectUrl: webhook.url === expectedUrl,
-        dateCreated: webhook.date_created
+        dateCreated: webhook.created_at
       })),
       expectedUrl,
       hasCorrectWebhook: webhooks.some(w => w.url === expectedUrl && w.is_active),
