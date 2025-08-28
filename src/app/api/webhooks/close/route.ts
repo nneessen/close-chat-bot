@@ -60,7 +60,15 @@ export async function POST(req: NextRequest) {
       text: payload.event?.data?.text?.substring(0, 100)
     });
     
-    // Store webhook event for processing with duplicate handling
+    // EARLY RETURN: Only process INBOUND SMS messages to avoid unnecessary work
+    if (payload.event.object_type === 'activity.sms' && 
+        payload.event.action === 'created' &&
+        payload.event.data.direction === 'outbound') {
+      console.log('🚫 Ignoring outbound SMS - returning immediately');
+      return NextResponse.json({ success: true, message: 'Outbound SMS ignored' });
+    }
+
+    // Store webhook event for processing with duplicate handling (INBOUND only)
     console.log('💾 Attempting to store webhook event in database...');
     let webhookEvent;
     try {
@@ -101,10 +109,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Only process INBOUND SMS messages
+    // Process INBOUND SMS messages (outbound already filtered out above)
     if (payload.event.object_type === 'activity.sms' && 
-        payload.event.action === 'created' &&
-        payload.event.data.direction === 'inbound') {
+        payload.event.action === 'created') {
       
       console.log('📥 Adding INBOUND SMS to queue:', {
         eventId: webhookEvent?.id || 'unknown',
@@ -135,11 +142,6 @@ export async function POST(req: NextRequest) {
         console.error('❌ Queue error adding SMS job:', queueError);
         throw queueError;
       }
-    } else if (payload.event.object_type === 'activity.sms') {
-      console.log('🚫 Ignoring outbound SMS:', {
-        direction: payload.event.data.direction,
-        text: payload.event.data.text?.substring(0, 30)
-      });
     }
 
     return NextResponse.json({ success: true, eventId: webhookEvent?.id || 'processed' });
