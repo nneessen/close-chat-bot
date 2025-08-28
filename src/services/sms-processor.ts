@@ -397,11 +397,19 @@ async function generateBotResponse(
         },
       });
       
-      const success = await closeService.sendSMS(lead.phone, greetingResponse, lead.closeId);
-      if (success) {
+      // Send greeting response via Close.io
+      const smsParams = {
+        leadId: lead.closeId,
+        text: greetingResponse,
+        localPhone: '872-312-7425', // Your Close.io number
+        remotePhone: lead.phone,
+      };
+      
+      try {
+        await closeService.sendSMS(smsParams);
         console.log('📤 Simple greeting response sent successfully');
-      } else {
-        console.error('❌ Failed to send simple greeting response');
+      } catch (smsError) {
+        console.error('❌ Failed to send simple greeting response:', smsError);
       }
       return;
     }
