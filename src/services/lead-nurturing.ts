@@ -17,6 +17,7 @@ export interface NurturingContext {
     role: string;
     content: string;
     timestamp: string;
+    botType?: string;
   }>;
 }
 
@@ -76,7 +77,7 @@ export class LeadNurturingService {
     }
   }
 
-  private determineCurrentStage(previousMessages: Array<{ role: string; content: string }>): string {
+  private determineCurrentStage(previousMessages: Array<{ role: string; content: string; botType?: string }>): string {
     if (previousMessages.length === 0) {
       return 'opening';
     }
@@ -86,6 +87,16 @@ export class LeadNurturingService {
     
     const lastBotMessage = botMessages.pop()?.content.toLowerCase() || '';
     const lastUserMessage = userMessages.pop()?.content.toLowerCase() || '';
+    
+    // CRITICAL: If we have substantial conversation history, never go back to opening
+    const allBotContentForStage = botMessages.map(m => m.content.toLowerCase()).join(' ');
+    const hasIntroductionAlready = allBotContentForStage.includes('looking forward to speaking') || 
+                                  allBotContentForStage.includes('assigned to go over') ||
+                                  allBotContentForStage.includes('i\'m nick neessen');
+    
+    if (hasIntroductionAlready && previousMessages.length > 4) {
+      console.log('🚨 CRITICAL: Extended conversation with introduction already sent - advancing stage');
+    }
 
     console.log('🔍 Stage detection:', {
       messageCount: previousMessages.length,
@@ -150,20 +161,21 @@ export class LeadNurturingService {
   private handleOpeningStage(context: NurturingContext): NurturingStage {
     const { leadInfo, previousMessages } = context;
     
-    // If this is not the very first message in the conversation, move to permission stage
-    if (previousMessages.length > 0) {
-      const lastBotMessage = previousMessages
-        .filter(m => m.role === 'ASSISTANT' || m.role === 'assistant')
-        .pop()?.content || '';
-      
-      // If we've already sent the opening message, move to asking permission
-      if (lastBotMessage.includes('Looking forward to speaking')) {
-        return {
-          stage: 'opening',
-          nextStage: 'permission',
-          response: `Do you mind if I ask you a couple questions before we hop on a call?`
-        };
-      }
+    // CRITICAL FIX: Check if we've already sent introduction messages in ANY conversation
+    const allBotMessages = previousMessages.filter(m => m.role === 'ASSISTANT' || m.role === 'assistant');
+    const hasIntroductionAlready = allBotMessages.some(msg => 
+      msg.content.includes('Looking forward to speaking') || 
+      msg.content.includes('assigned to go over') ||
+      msg.content.includes('I\'m Nick Neessen')
+    );
+    
+    if (hasIntroductionAlready || previousMessages.length > 2) {
+      console.log('🚨 CRITICAL: Introduction already sent or mid-conversation - skipping to permission stage');
+      return {
+        stage: 'opening',
+        nextStage: 'permission',
+        response: `Do you mind if I ask you a couple questions before we hop on a call?`
+      };
     }
     
     return {

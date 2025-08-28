@@ -10,16 +10,21 @@ export async function GET() {
     redis: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
     closeio: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
     environment: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '' },
+    bot: { status: 'unknown' as 'ok' | 'error' | 'unknown', details: '', enabled: false },
   };
 
   // Database check
   try {
+    console.log('🔍 DATABASE_URL at runtime:', process.env.DATABASE_URL?.substring(0, 50) + '...');
+    console.log('🔍 SKIP_ENV_VALIDATION:', process.env.SKIP_ENV_VALIDATION);
     await prisma.$queryRaw`SELECT 1`;
     checks.database.status = 'ok';
     checks.database.details = 'Connected to database successfully';
   } catch (error) {
     checks.database.status = 'error';
     checks.database.details = error instanceof Error ? error.message : 'Database connection failed';
+    console.error('❌ Database connection error:', error);
+    console.log('🔍 Actual DATABASE_URL being used:', process.env.DATABASE_URL);
   }
 
   // Redis check
@@ -67,6 +72,20 @@ export async function GET() {
   } catch (error) {
     checks.environment.status = 'error';
     checks.environment.details = error instanceof Error ? error.message : 'Environment check failed';
+  }
+
+  // Bot status check
+  try {
+    const botConfig = await prisma.systemConfig.findUnique({
+      where: { key: 'bot_enabled' }
+    });
+    const isEnabled = botConfig?.value === true;
+    checks.bot.status = 'ok';
+    checks.bot.enabled = isEnabled;
+    checks.bot.details = isEnabled ? 'Bot is enabled and will respond to SMS' : 'Bot is disabled and will not respond to SMS';
+  } catch (error) {
+    checks.bot.status = 'error';
+    checks.bot.details = error instanceof Error ? error.message : 'Bot status check failed';
   }
 
   // Overall health status

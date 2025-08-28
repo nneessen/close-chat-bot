@@ -69,6 +69,20 @@ async function handleInboundSMS(smsData: { [key: string]: unknown; id: string })
   console.log('📞 Handling inbound SMS from:', smsData.remote_phone);
   console.log('💬 Message:', smsData.text);
   
+  // Check if bot is enabled
+  console.log('🤖 Checking bot status...');
+  const botConfig = await prisma.systemConfig.findUnique({
+    where: { key: 'bot_enabled' }
+  });
+  
+  const isBotEnabled = botConfig?.value === true;
+  console.log(`🤖 Bot status: ${isBotEnabled ? 'ENABLED' : 'DISABLED'}`);
+  
+  if (!isBotEnabled) {
+    console.log('🚫 Bot is disabled - skipping SMS processing');
+    return;
+  }
+  
   // Get or create lead
   console.log('👤 Getting/creating lead...');
   const lead = await getOrCreateLead(smsData.lead_id as string, smsData.remote_phone as string);
@@ -262,23 +276,58 @@ async function generateBotResponse(
   botType: BotType,
   lead: Lead
 ) {
-  // Get conversation history
+  // CRITICAL FIX: Get ALL conversation history for this lead, not just current conversation
+  // This was causing the bot to lose context when switching between bot types
   const messages = await prisma.message.findMany({
-    where: { conversationId },
+    where: { 
+      conversation: {
+        leadId: lead.id
+      }
+    },
     orderBy: { createdAt: 'asc' },
-    take: 10,
+    take: 20, // Increased from 10 to get more context
+    include: {
+      conversation: {
+        select: {
+          botType: true
+        }
+      }
+    }
   });
+
+  console.log(`📚 Retrieved ${messages.length} messages from ALL conversations for lead ${lead.id}`);
+  
+  // Log conversation history for debugging
+  if (messages.length > 0) {
+    console.log('🔍 Recent conversation history:');
+    messages.slice(-5).forEach((msg, index) => {
+      console.log(`  ${index + 1}. [${msg.conversation.botType}] ${msg.role}: "${msg.content.substring(0, 100)}..."`);
+    });
+  } else {
+    console.log('⚠️ WARNING: No conversation history found for this lead!');
+  }
 
   // Check for duplicate responses to prevent repetition
   const lastBotMessage = messages
     .filter(msg => msg.role === MessageRole.ASSISTANT)
     .pop();
 
+  // CRITICAL: Detect if we're mid-conversation and prevent inappropriate introductory responses
+  const hasExistingConversation = messages.filter(msg => msg.role === MessageRole.USER).length > 1;
+  const lastUserMessage = messages.filter(msg => msg.role === MessageRole.USER).pop()?.content || '';
+  
+  if (hasExistingConversation) {
+    console.log('🚨 EXISTING CONVERSATION DETECTED - preventing introduction message');
+    console.log(`📝 Last user message: "${lastUserMessage}"`);
+    console.log(`📝 Current user message: "${userMessage}"`);
+  }
+
   console.log('🧠 Generating response for:', {
     userMessage: userMessage.substring(0, 50),
     botType,
     messageCount: messages.length,
-    lastBotContent: lastBotMessage?.content.substring(0, 50)
+    lastBotContent: lastBotMessage?.content.substring(0, 50),
+    conversationTypes: [...new Set(messages.map(m => m.conversation.botType))]
   });
 
   // Simple appointment detection
@@ -309,6 +358,7 @@ async function generateBotResponse(
         role: msg.role.toLowerCase() as 'user' | 'assistant',
         content: msg.content,
         timestamp: msg.createdAt.toISOString(),
+        botType: msg.conversation.botType,
       })),
     };
 
@@ -351,6 +401,7 @@ async function generateBotResponse(
       role: msg.role.toLowerCase() as 'user' | 'assistant',
       content: msg.content,
       timestamp: msg.createdAt.toISOString(),
+      botType: msg.conversation.botType,
     })),
   };
 
@@ -380,7 +431,7 @@ async function generateBotResponse(
 async function generateTemplateResponse(
   userMessage: string,
   lead: Lead,
-  messages: Array<{ role: MessageRole; content: string; createdAt: Date }>
+  messages: Array<{ role: MessageRole; content: string; createdAt: Date; conversation: { botType: string } }>
 ) {
   console.log('📝 Using template engine for response generation');
   
@@ -424,7 +475,7 @@ async function generateTemplateResponse(
   }
 }
 
-function analyzeMessageForTemplate(userMessage: string, messages: Array<{ role: MessageRole; content: string; createdAt: Date }>) {
+function analyzeMessageForTemplate(userMessage: string, messages: Array<{ role: MessageRole; content: string; createdAt: Date; conversation: { botType: string } }>) {
   const lowerMessage = userMessage.toLowerCase();
   const messageCount = messages.length;
   
@@ -488,7 +539,7 @@ function getDayOfWeek(): 'weekday' | 'weekend' {
 async function generateNurturingFallback(
   userMessage: string,
   lead: Lead,
-  messages: Array<{ role: MessageRole; content: string; createdAt: Date }>
+  messages: Array<{ role: MessageRole; content: string; createdAt: Date; conversation: { botType: string } }>
 ) {
   console.log('🎯 Using lead nurturing fallback');
   
@@ -508,6 +559,7 @@ async function generateNurturingFallback(
       role: msg.role.toLowerCase() as 'user' | 'assistant',
       content: msg.content,
       timestamp: msg.createdAt.toISOString(),
+      botType: msg.conversation.botType,
     })),
   };
 
@@ -529,7 +581,7 @@ async function generateNurturingFallback(
 async function generateFallbackResponse(
   userMessage: string, 
   lead: Lead, 
-  messages: Array<{ role: MessageRole; content: string; createdAt: Date }>
+  messages: Array<{ role: MessageRole; content: string; createdAt: Date; conversation: { botType: string } }>
 ) {
   console.log('🤖 Using LLM fallback response');
   
@@ -545,6 +597,7 @@ async function generateFallbackResponse(
       role: msg.role.toLowerCase() as 'user' | 'assistant',
       content: msg.content,
       timestamp: msg.createdAt.toISOString(),
+      botType: msg.conversation.botType,
     })),
     botType: 'objection' as const,
   };
